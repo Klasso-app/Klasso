@@ -88,23 +88,23 @@ export default function DirecteurHomePage() {
       </div>
 
       <div className="rounded-xl border border-line bg-surface">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 sm:px-6 py-5">
           <h2 className="font-display text-base text-ink">Derniers élèves inscrits</h2>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 border border-line rounded-lg px-3 py-2">
+            <div className="hidden sm:flex items-center gap-2 border border-line rounded-lg px-3 py-2">
               <IconSearch className="w-4 h-4 text-ink-soft" />
               <input
                 placeholder="Rechercher..."
                 className="text-sm outline-none placeholder:text-ink-soft/60 w-32"
               />
             </div>
-            <button className="flex items-center gap-1.5 text-sm border border-line rounded-lg px-3 py-2 text-ink-soft">
+            <button className="hidden sm:flex items-center gap-1.5 text-sm border border-line rounded-lg px-3 py-2 text-ink-soft">
               <IconFilter className="w-4 h-4" />
               Filtrer
             </button>
             <Link
               to="/app/eleves"
-              className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-3 py-2"
+              className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-3 py-2"
             >
               <IconPlus className="w-4 h-4" />
               Nouvel élève

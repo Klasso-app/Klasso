@@ -49,6 +49,11 @@ html {
   color: var(--color-ink);
 }
 
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 * {
   border-color: var(--color-line);
 }
