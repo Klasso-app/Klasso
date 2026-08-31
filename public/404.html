@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Klasso</title>
+    <script>
+      // GitHub Pages ne sait pas router les URL comme /connexion vers notre
+      // application React (hébergement purement statique). Cette page 404
+      // encode le chemin demandé et redirige vers index.html, qui le
+      // restaure ensuite avec history.replaceState (voir index.html).
+      var path = location.pathname.replace('/Klasso/', '');
+      location.replace('/Klasso/?redirect=' + encodeURIComponent(path) + location.search + location.hash);
+    </script>
+  </head>
+  <body></body>
+</html>

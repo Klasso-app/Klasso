@@ -9,6 +9,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      // Restaure le vrai chemin après une redirection depuis 404.html
+      // (voir public/404.html pour l'explication du mécanisme).
+      (function () {
+        var redirect = new URLSearchParams(location.search).get("redirect");
+        if (redirect) {
+          var url = new URL(location.href);
+          url.searchParams.delete("redirect");
+          history.replaceState(null, "", "/Klasso/" + redirect + url.search);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
