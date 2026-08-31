@@ -10,10 +10,12 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [school, setSchool] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
+      setProfileError(null);
 
       if (!user) {
         setProfile(null);
@@ -24,6 +26,15 @@ export function AuthProvider({ children }) {
 
       try {
         const userProfile = await getUserProfile(user.uid);
+
+        if (!userProfile) {
+          setProfileError(
+            "Aucun profil n'a été trouvé pour ce compte. Contactez la direction de votre établissement."
+          );
+          setLoading(false);
+          return;
+        }
+
         setProfile(userProfile);
 
         if (userProfile?.schoolId) {
@@ -32,6 +43,11 @@ export function AuthProvider({ children }) {
         }
       } catch (err) {
         console.error("Erreur de chargement du profil :", err);
+        setProfileError(
+          err?.code === "permission-denied"
+            ? "L'accès aux données a été refusé. Les règles de sécurité Firestore ne sont probablement pas encore publiées."
+            : "Une erreur est survenue lors du chargement de votre espace."
+        );
       } finally {
         setLoading(false);
       }
@@ -53,7 +69,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ firebaseUser, profile, school, loading, signOut, refreshSchool }}
+      value={{ firebaseUser, profile, school, loading, profileError, signOut, refreshSchool }}
     >
       {children}
     </AuthContext.Provider>
