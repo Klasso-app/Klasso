@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand colors — Klasso */
+  --color-indigo-50: #EEF0FD;
+  --color-indigo-100: #DBE0FB;
+  --color-indigo-200: #B4BEF6;
+  --color-indigo-300: #8D9CF1;
+  --color-indigo-400: #6679E9;
+  --color-indigo-500: #3B4FE0;
+  --color-indigo-600: #2F3EBB;
+  --color-indigo-700: #263295;
+  --color-indigo-800: #1D2670;
+  --color-indigo-900: #151B4F;
+
+  --color-terracotta-50: #FBF0EA;
+  --color-terracotta-100: #F4DBCB;
+  --color-terracotta-300: #DA9A6E;
+  --color-terracotta-500: #C6703B;
+  --color-terracotta-600: #A85B2B;
+  --color-terracotta-700: #874821;
+
+  --color-marine-50: #F1F3F7;
+  --color-marine-100: #DCE1EA;
+  --color-marine-300: #7C8AA3;
+  --color-marine-500: #3E4C6A;
+  --color-marine-700: #24304A;
+  --color-marine-900: #1F2E4D;
+
+  --color-ink: #1A1A1A;
+  --color-ink-soft: #4B5160;
+  --color-line: #E4E6EE;
+  --color-surface: #FFFFFF;
+  --color-surface-tint: #F6F7FB;
+
+  --color-success: #1E7D4F;
+  --color-success-soft: #E4F3EA;
+  --color-warning: #B4670F;
+  --color-warning-soft: #FBEEDF;
+  --color-danger: #B23B3B;
+  --color-danger-soft: #FBE7E7;
+
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  font-family: var(--font-body);
+  color: var(--color-ink);
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-indigo-500);
+  outline-offset: 2px;
+}
+
+@keyframes klasso-bar {
+  0%, 100% { height: 10px; opacity: 0.55; }
+  50% { height: 34px; opacity: 1; }
+}
+
+.animate-klasso-bar {
+  animation: klasso-bar 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-klasso-bar {
+    animation: none;
+    height: 22px;
+    opacity: 1;
+  }
+}
