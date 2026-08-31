@@ -27,7 +27,7 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter basename="/Klasso">
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/connexion" element={<LoginPage />} />
