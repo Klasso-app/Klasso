@@ -33,8 +33,20 @@ export default function CreateSchoolPage() {
     }
 
     setSubmitting(true);
+    let cred;
     try {
-      const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
+      cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
+    } catch (err) {
+      setSubmitting(false);
+      setError(
+        err.code === "auth/email-already-in-use"
+          ? "Cette adresse e-mail est déjà utilisée."
+          : "Impossible de créer le compte. Merci de réessayer."
+      );
+      return;
+    }
+
+    try {
       await createSchoolAndDirector({
         uid: cred.user.uid,
         schoolName: form.schoolName,
@@ -45,11 +57,21 @@ export default function CreateSchoolPage() {
       });
       navigate("/app");
     } catch (err) {
-      if (err.code === "auth/email-already-in-use") {
-        setError("Cette adresse e-mail est déjà utilisée.");
-      } else {
-        setError("Une erreur est survenue. Merci de réessayer.");
+      // La création du compte a réussi mais l'enregistrement de l'école a
+      // échoué (ex : règles Firestore non publiées). On supprime le compte
+      // fraîchement créé pour éviter un compte "orphelin" sans profil, et on
+      // laisse la personne réessayer proprement.
+      console.error("Erreur lors de la création de l'établissement :", err);
+      try {
+        await cred.user.delete();
+      } catch (cleanupErr) {
+        console.error("Nettoyage du compte impossible :", cleanupErr);
       }
+      setError(
+        err.code === "permission-denied"
+          ? "L'accès à la base de données a été refusé. Les règles de sécurité Firestore ne sont probablement pas encore publiées. Votre compte n'a pas été créé, vous pouvez réessayer une fois les règles publiées."
+          : "Une erreur est survenue pendant la création de l'établissement. Votre compte n'a pas été créé, vous pouvez réessayer."
+      );
     } finally {
       setSubmitting(false);
     }
