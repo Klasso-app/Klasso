@@ -2,21 +2,28 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import KlassoLogo from "../ui/KlassoLogo";
 import { navByRole, roleLabel } from "./navConfig";
-import { IconMoreVertical } from "../icons";
+import { IconClose, IconMoreVertical } from "../icons";
 
-export default function Sidebar() {
+export default function MobileNav({ open, onClose }) {
   const { profile, school, signOut } = useAuth();
+
+  if (!open) return null;
+
   const role = profile?.role || "directeur";
   const sections = navByRole[role] || navByRole.directeur;
 
   return (
-    <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-line bg-surface h-screen sticky top-0">
-      <div className="px-5 py-5 border-b border-line">
-        <KlassoLogo size={30} />
-        {school?.name && (
-          <p className="mt-3 text-xs text-ink-soft truncate">{school.name}</p>
-        )}
+    <div className="fixed inset-0 z-50 flex flex-col bg-surface lg:hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+        <KlassoLogo size={28} />
+        <button onClick={onClose} aria-label="Fermer le menu" className="p-1.5 text-ink-soft">
+          <IconClose className="w-5 h-5" />
+        </button>
       </div>
+
+      {school?.name && (
+        <p className="px-5 pt-4 text-xs text-ink-soft truncate">{school.name}</p>
+      )}
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-6">
         {sections.map((section) => (
@@ -28,15 +35,16 @@ export default function Sidebar() {
                   key={item.to}
                   to={item.to}
                   end={item.end}
+                  onClick={onClose}
                   className={({ isActive }) =>
-                    `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm ${
+                    `flex items-center gap-3 px-2.5 py-3 rounded-lg text-base ${
                       isActive
                         ? "bg-indigo-50 text-indigo-600 font-medium"
-                        : "text-ink-soft"
+                        : "text-ink"
                     }`
                   }
                 >
-                  <item.icon className="w-4.5 h-4.5" />
+                  <item.icon className="w-5 h-5" />
                   {item.label}
                 </NavLink>
               ))}
@@ -59,6 +67,6 @@ export default function Sidebar() {
           <IconMoreVertical className="w-4 h-4" />
         </button>
       </div>
-    </aside>
+    </div>
   );
 }
