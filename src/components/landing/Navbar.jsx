@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { IconMenu, IconClose } from "../icons";
 import KlassoLogo from "../ui/KlassoLogo";
 
@@ -30,15 +31,15 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
-          <a href="#connexion" className="text-sm font-medium text-ink px-4 py-2">
+          <Link to="/connexion" className="text-sm font-medium text-ink px-4 py-2">
             Se connecter
-          </a>
-          <a
-            href="#demo"
+          </Link>
+          <Link
+            to="/creer-etablissement"
             className="text-sm font-medium text-white bg-indigo-500 px-4 py-2 rounded-lg"
           >
-            Demander une démo
-          </a>
+            Créer mon établissement
+          </Link>
         </div>
 
         <button
@@ -57,15 +58,15 @@ export default function Navbar() {
               {l.label}
             </a>
           ))}
-          <a href="#connexion" className="text-sm font-medium text-ink">
+          <Link to="/connexion" className="text-sm font-medium text-ink">
             Se connecter
-          </a>
-          <a
-            href="#demo"
+          </Link>
+          <Link
+            to="/creer-etablissement"
             className="text-sm font-medium text-white bg-indigo-500 px-4 py-2 rounded-lg text-center"
           >
-            Demander une démo
-          </a>
+            Créer mon établissement
+          </Link>
         </div>
       )}
     </header>
