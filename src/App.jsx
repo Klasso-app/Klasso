@@ -9,11 +9,18 @@ import Loader from "./components/ui/Loader";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import CreateSchoolPage from "./pages/CreateSchoolPage";
+import JoinAsParentPage from "./pages/JoinAsParentPage";
 import RoleHomePage from "./pages/RoleHomePage";
 import StudentsPage from "./pages/dashboard/StudentsPage";
+import TeachersPage from "./pages/dashboard/TeachersPage";
+import ClassesPage from "./pages/dashboard/ClassesPage";
+import GradesPage from "./pages/dashboard/GradesPage";
+import FinancesPage from "./pages/dashboard/FinancesPage";
+import SchedulePage from "./pages/dashboard/SchedulePage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
+import ParentHomePage from "./pages/dashboard/ParentHomePage";
 import ComingSoonPage from "./pages/dashboard/ComingSoonPage";
-import { IconClipboard, IconLayers, IconWallet, IconChart, IconCalendar, IconUsers } from "./components/icons";
+import { IconClipboard, IconUsers } from "./components/icons";
 
 export default function App() {
   const [booting, setBooting] = useState(true);
@@ -32,6 +39,7 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/connexion" element={<LoginPage />} />
           <Route path="/creer-etablissement" element={<CreateSchoolPage />} />
+          <Route path="/rejoindre-parent" element={<JoinAsParentPage />} />
 
           <Route
             path="/app"
@@ -43,37 +51,16 @@ export default function App() {
           >
             <Route index element={<Page title="Tableau de bord"><RoleHomePage /></Page>} />
             <Route path="eleves" element={<Page title="Élèves"><StudentsPage /></Page>} />
-            <Route
-              path="enseignants"
-              element={<Page title="Enseignants"><ComingSoonPage icon={IconClipboard} title="Gestion des enseignants" /></Page>}
-            />
-            <Route
-              path="classes"
-              element={<Page title="Classes"><ComingSoonPage icon={IconLayers} title="Gestion des classes" /></Page>}
-            />
-            <Route
-              path="finances"
-              element={<Page title="Finances"><ComingSoonPage icon={IconWallet} title="Suivi des frais de scolarité" /></Page>}
-            />
+            <Route path="enseignants" element={<Page title="Enseignants"><TeachersPage /></Page>} />
+            <Route path="classes" element={<Page title="Classes"><ClassesPage /></Page>} />
+            <Route path="notes" element={<Page title="Notes"><GradesPage /></Page>} />
+            <Route path="finances" element={<Page title="Finances"><FinancesPage /></Page>} />
+            <Route path="emploi-du-temps" element={<Page title="Emploi du temps"><SchedulePage /></Page>} />
+            <Route path="mes-classes" element={<Page title="Mes classes"><ClassesPage /></Page>} />
+            <Route path="mes-enfants" element={<Page title="Mes enfants"><ParentHomePage /></Page>} />
             <Route
               path="inscriptions"
               element={<Page title="Inscriptions"><ComingSoonPage icon={IconClipboard} title="Suivi des inscriptions" /></Page>}
-            />
-            <Route
-              path="mes-classes"
-              element={<Page title="Mes classes"><ComingSoonPage icon={IconLayers} title="Vos classes" /></Page>}
-            />
-            <Route
-              path="notes"
-              element={<Page title="Notes"><ComingSoonPage icon={IconChart} title="Saisie des notes" /></Page>}
-            />
-            <Route
-              path="emploi-du-temps"
-              element={<Page title="Emploi du temps"><ComingSoonPage icon={IconCalendar} title="Emploi du temps" /></Page>}
-            />
-            <Route
-              path="mes-enfants"
-              element={<Page title="Mes enfants"><ComingSoonPage icon={IconUsers} title="Vos enfants" /></Page>}
             />
             <Route
               path="parametres"

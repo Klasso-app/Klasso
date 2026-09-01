@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
+import { fetchAllGrades, schoolAverage } from "../../lib/grades";
 import StatCard from "../../components/dashboard/StatCard";
 import EmptyState from "../../components/dashboard/EmptyState";
 import {
@@ -27,6 +28,7 @@ export default function DirecteurHomePage() {
   const schoolId = profile?.schoolId;
 
   const [counts, setCounts] = useState({ students: null, teachers: null, classes: null });
+  const [avgGrade, setAvgGrade] = useState(null);
   const [recentStudents, setRecentStudents] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
 
@@ -45,6 +47,15 @@ export default function DirecteurHomePage() {
       });
     }
 
+    async function loadAverage() {
+      const [grades, studentsSnap] = await Promise.all([
+        fetchAllGrades(schoolId),
+        getDocs(collection(db, "schools", schoolId, "students")),
+      ]);
+      const studentIds = studentsSnap.docs.map((d) => d.id);
+      setAvgGrade(schoolAverage(grades, studentIds));
+    }
+
     async function loadRecentStudents() {
       setLoadingList(true);
       const q = query(
@@ -58,6 +69,7 @@ export default function DirecteurHomePage() {
     }
 
     loadCounts().catch(() => setCounts({ students: 0, teachers: 0, classes: 0 }));
+    loadAverage().catch(() => setAvgGrade(null));
     loadRecentStudents().catch(() => setLoadingList(false));
   }, [schoolId]);
 
@@ -67,7 +79,7 @@ export default function DirecteurHomePage() {
         <StatCard icon={IconUsers} label="Effectif total" value={fmt(counts.students)} />
         <StatCard icon={IconClipboard} label="Enseignants" value={fmt(counts.teachers)} />
         <StatCard icon={IconLayers} label="Classes" value={fmt(counts.classes)} />
-        <StatCard icon={IconChart} label="Moyenne générale" value="—" />
+        <StatCard icon={IconChart} label="Moyenne générale" value={avgGrade === null ? "—" : `${avgGrade} / 20`} />
       </div>
 
       <div className="rounded-xl border border-line bg-surface">

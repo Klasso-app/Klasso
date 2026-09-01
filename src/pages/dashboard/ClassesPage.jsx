@@ -1,0 +1,182 @@
+import { useEffect, useState } from "react";
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp,
+} from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import { useAuth } from "../../context/AuthContext";
+import { IconPlus, IconLayers } from "../../components/icons";
+import EmptyState from "../../components/dashboard/EmptyState";
+import FormField, { TextInput, Select } from "../../components/auth/FormField";
+
+export default function ClassesPage() {
+  const { profile } = useAuth();
+  const schoolId = profile?.schoolId;
+
+  const [classes, setClasses] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    if (!schoolId) return;
+
+    const unsubClasses = onSnapshot(
+      query(collection(db, "schools", schoolId, "classes"), orderBy("createdAt", "desc")),
+      (snap) => {
+        setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      }
+    );
+    const unsubTeachers = onSnapshot(
+      collection(db, "schools", schoolId, "teachers"),
+      (snap) => setTeachers(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+    const unsubStudents = onSnapshot(
+      collection(db, "schools", schoolId, "students"),
+      (snap) => setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+
+    return () => {
+      unsubClasses();
+      unsubTeachers();
+      unsubStudents();
+    };
+  }, [schoolId]);
+
+  function studentCount(className) {
+    return students.filter((s) => s.classLabel === className).length;
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-ink-soft">
+          {classes.length} classe{classes.length > 1 ? "s" : ""}
+        </p>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
+        >
+          <IconPlus className="w-4 h-4" />
+          Nouvelle classe
+        </button>
+      </div>
+
+      {showForm && (
+        <NewClassForm schoolId={schoolId} teachers={teachers} onDone={() => setShowForm(false)} />
+      )}
+
+      <div className="rounded-xl border border-line bg-surface">
+        {!loading && classes.length === 0 ? (
+          <EmptyState
+            icon={IconLayers}
+            title="Aucune classe créée"
+            text="Créez vos classes (ex : CP, CM2, 6ème A) pour pouvoir y inscrire des élèves et affecter des enseignants."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-ink-soft">
+                  <th className="px-6 py-3 font-medium">Classe</th>
+                  <th className="px-6 py-3 font-medium">Niveau</th>
+                  <th className="px-6 py-3 font-medium">Enseignant principal</th>
+                  <th className="px-6 py-3 font-medium">Effectif</th>
+                </tr>
+              </thead>
+              <tbody>
+                {classes.map((c) => (
+                  <tr key={c.id} className="border-t border-line">
+                    <td className="px-6 py-3 text-ink">{c.name}</td>
+                    <td className="px-6 py-3 text-ink-soft">{c.level || "—"}</td>
+                    <td className="px-6 py-3 text-ink-soft">{c.headTeacherName || "—"}</td>
+                    <td className="px-6 py-3 text-ink-soft">{studentCount(c.name)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NewClassForm({ schoolId, teachers, onDone }) {
+  const [form, setForm] = useState({ name: "", level: "", headTeacherId: "" });
+  const [submitting, setSubmitting] = useState(false);
+
+  function update(field) {
+    return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const headTeacher = teachers.find((t) => t.id === form.headTeacherId);
+      await addDoc(collection(db, "schools", schoolId, "classes"), {
+        name: form.name,
+        level: form.level,
+        headTeacherId: form.headTeacherId || null,
+        headTeacherName: headTeacher?.fullName || "",
+        createdAt: serverTimestamp(),
+      });
+      setForm({ name: "", level: "", headTeacherId: "" });
+      onDone();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-xl border border-line bg-surface p-6 flex flex-col gap-4">
+      <h2 className="font-display text-base text-ink">Créer une classe</h2>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <FormField label="Nom de la classe">
+          <TextInput
+            required
+            value={form.name}
+            onChange={update("name")}
+            placeholder="Ex : 6ème A, CM2, Grande Section"
+          />
+        </FormField>
+        <FormField label="Niveau">
+          <TextInput
+            value={form.level}
+            onChange={update("level")}
+            placeholder="Ex : Maternelle, CM2, Collège"
+          />
+        </FormField>
+        <FormField label="Enseignant principal">
+          <Select value={form.headTeacherId} onChange={update("headTeacherId")}>
+            <option value="">Aucun pour le moment</option>
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>{t.fullName}</option>
+            ))}
+          </Select>
+        </FormField>
+      </div>
+
+      <div className="flex items-center gap-3 mt-2">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60"
+        >
+          {submitting ? "Création" : "Créer la classe"}
+        </button>
+        <button type="button" onClick={onDone} className="text-sm text-ink-soft px-4 py-2.5">
+          Annuler
+        </button>
+      </div>
+    </form>
+  );
+}

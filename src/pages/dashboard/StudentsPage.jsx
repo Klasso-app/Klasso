@@ -9,15 +9,17 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
+import { createParentInvitation } from "../../lib/invitations";
 import { IconPlus, IconUsers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
-import FormField, { TextInput } from "../../components/auth/FormField";
+import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
 export default function StudentsPage() {
   const { profile } = useAuth();
   const schoolId = profile?.schoolId;
 
   const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
 
@@ -31,7 +33,14 @@ export default function StudentsPage() {
       setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
-    return unsub;
+    const unsubClasses = onSnapshot(
+      collection(db, "schools", schoolId, "classes"),
+      (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+    return () => {
+      unsub();
+      unsubClasses();
+    };
   }, [schoolId]);
 
   return (
@@ -50,7 +59,7 @@ export default function StudentsPage() {
       </div>
 
       {showForm && (
-        <NewStudentForm schoolId={schoolId} onDone={() => setShowForm(false)} />
+        <NewStudentForm schoolId={schoolId} classes={classes} onDone={() => setShowForm(false)} />
       )}
 
       <div className="rounded-xl border border-line bg-surface">
@@ -69,6 +78,7 @@ export default function StudentsPage() {
                   <th className="px-6 py-3 font-medium">Classe</th>
                   <th className="px-6 py-3 font-medium">Date de naissance</th>
                   <th className="px-6 py-3 font-medium">Contact tuteur</th>
+                  <th className="px-6 py-3 font-medium">Compte parent</th>
                 </tr>
               </thead>
               <tbody>
@@ -78,6 +88,9 @@ export default function StudentsPage() {
                     <td className="px-6 py-3 text-ink-soft">{s.classLabel || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{s.birthDate || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{s.guardianPhone || "—"}</td>
+                    <td className="px-6 py-3">
+                      <ParentCodeCell schoolId={schoolId} student={s} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -89,7 +102,40 @@ export default function StudentsPage() {
   );
 }
 
-function NewStudentForm({ schoolId, onDone }) {
+function ParentCodeCell({ schoolId, student }) {
+  const [code, setCode] = useState(null);
+  const [generating, setGenerating] = useState(false);
+
+  async function handleGenerate() {
+    setGenerating(true);
+    try {
+      const newCode = await createParentInvitation({
+        schoolId,
+        studentId: student.id,
+        studentName: student.fullName,
+      });
+      setCode(newCode);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  if (code) {
+    return <span className="font-mono text-indigo-600 font-medium">{code}</span>;
+  }
+
+  return (
+    <button
+      onClick={handleGenerate}
+      disabled={generating}
+      className="text-xs text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1 disabled:opacity-60"
+    >
+      {generating ? "..." : "Générer un code"}
+    </button>
+  );
+}
+
+function NewStudentForm({ schoolId, classes, onDone }) {
   const [form, setForm] = useState({
     fullName: "",
     classLabel: "",
@@ -130,12 +176,21 @@ function NewStudentForm({ schoolId, onDone }) {
           <TextInput required value={form.fullName} onChange={update("fullName")} />
         </FormField>
         <FormField label="Classe">
-          <TextInput
-            required
-            value={form.classLabel}
-            onChange={update("classLabel")}
-            placeholder="Ex : CM2, 6ème A"
-          />
+          {classes.length > 0 ? (
+            <Select required value={form.classLabel} onChange={update("classLabel")}>
+              <option value="">Sélectionner une classe</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </Select>
+          ) : (
+            <TextInput
+              required
+              value={form.classLabel}
+              onChange={update("classLabel")}
+              placeholder="Ex : CM2, 6ème A"
+            />
+          )}
         </FormField>
         <FormField label="Date de naissance">
           <TextInput type="date" value={form.birthDate} onChange={update("birthDate")} />
@@ -147,6 +202,13 @@ function NewStudentForm({ schoolId, onDone }) {
           <TextInput value={form.guardianPhone} onChange={update("guardianPhone")} />
         </FormField>
       </div>
+
+      {classes.length === 0 && (
+        <p className="text-xs text-ink-soft -mt-2">
+          Astuce : créez d'abord vos classes dans le module « Classes » pour pouvoir les
+          sélectionner directement ici.
+        </p>
+      )}
 
       <div className="flex items-center gap-3 mt-2">
         <button

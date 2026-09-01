@@ -5,6 +5,11 @@ import { Page } from "../context/PageTitleContext";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import RoleHomePage from "../pages/RoleHomePage";
 import StudentsPage from "../pages/dashboard/StudentsPage";
+import TeachersPage from "../pages/dashboard/TeachersPage";
+import ClassesPage from "../pages/dashboard/ClassesPage";
+import GradesPage from "../pages/dashboard/GradesPage";
+import FinancesPage from "../pages/dashboard/FinancesPage";
+import SchedulePage from "../pages/dashboard/SchedulePage";
 import SettingsPage from "../pages/dashboard/SettingsPage";
 
 const role = new URLSearchParams(window.location.search).get("role") || "directeur";
@@ -17,6 +22,7 @@ const fakeValue = {
     role,
     schoolId: "dev-school",
     canEditSchoolSettings: role === "directeur",
+    parentOf: [],
   },
   school: {
     id: "dev-school",
@@ -37,6 +43,11 @@ export default function DevPreviewApp() {
           <Route path="/app" element={<DashboardLayout />}>
             <Route index element={<Page title="Tableau de bord"><RoleHomePage /></Page>} />
             <Route path="eleves" element={<Page title="Élèves"><StudentsPage /></Page>} />
+            <Route path="enseignants" element={<Page title="Enseignants"><TeachersPage /></Page>} />
+            <Route path="classes" element={<Page title="Classes"><ClassesPage /></Page>} />
+            <Route path="notes" element={<Page title="Notes"><GradesPage /></Page>} />
+            <Route path="finances" element={<Page title="Finances"><FinancesPage /></Page>} />
+            <Route path="emploi-du-temps" element={<Page title="Emploi du temps"><SchedulePage /></Page>} />
             <Route path="parametres" element={<Page title="Paramètres de l'école"><SettingsPage /></Page>} />
           </Route>
         </Routes>

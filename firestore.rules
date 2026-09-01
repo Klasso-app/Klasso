@@ -47,5 +47,15 @@ service cloud.firestore {
         allow read, write: if belongsToSchool(schoolId);
       }
     }
+
+    // Invitations parent : un membre du personnel crée un code pour un
+    // élève de son établissement. N'importe quel utilisateur connecté peut
+    // lire un code précis (il doit le connaître, il ne peut pas les lister)
+    // et le marquer comme utilisé lors de la création de son compte parent.
+    match /parentInvitations/{code} {
+      allow read: if isSignedIn();
+      allow create: if belongsToSchool(request.resource.data.schoolId);
+      allow update: if isSignedIn() && resource.data.used == false;
+    }
   }
 }

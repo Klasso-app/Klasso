@@ -82,6 +82,12 @@ export default function LoginPage() {
             Créer un espace établissement
           </Link>
         </p>
+        <p className="mt-3 text-center text-sm text-ink-soft">
+          Vous êtes parent d'élève ?{" "}
+          <Link to="/rejoindre-parent" className="text-indigo-500 font-medium">
+            Rejoindre avec un code
+          </Link>
+        </p>
       </div>
     </div>
   );
