@@ -12,6 +12,7 @@ import FinancesPage from "../pages/dashboard/FinancesPage";
 import SchedulePage from "../pages/dashboard/SchedulePage";
 import AbsencesPage from "../pages/dashboard/AbsencesPage";
 import AnnouncementsPage from "../pages/dashboard/AnnouncementsPage";
+import StatsPage from "../pages/dashboard/StatsPage";
 import SettingsPage from "../pages/dashboard/SettingsPage";
 
 const role = new URLSearchParams(window.location.search).get("role") || "directeur";
@@ -52,6 +53,7 @@ export default function DevPreviewApp() {
             <Route path="emploi-du-temps" element={<Page title="Emploi du temps"><SchedulePage /></Page>} />
             <Route path="absences" element={<Page title="Absences"><AbsencesPage /></Page>} />
             <Route path="annonces" element={<Page title="Annonces"><AnnouncementsPage /></Page>} />
+            <Route path="statistiques" element={<Page title="Statistiques"><StatsPage /></Page>} />
             <Route path="parametres" element={<Page title="Paramètres de l'école"><SettingsPage /></Page>} />
           </Route>
         </Routes>

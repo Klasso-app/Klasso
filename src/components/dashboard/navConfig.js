@@ -20,6 +20,7 @@ export const navByRole = {
       { to: "/app/notes", label: "Notes", icon: IconChart },
       { to: "/app/absences", label: "Absences", icon: IconCalendar },
       { to: "/app/finances", label: "Finances", icon: IconWallet },
+      { to: "/app/statistiques", label: "Statistiques", icon: IconChart },
       { to: "/app/annonces", label: "Annonces", icon: IconMessage },
     ]},
     { section: "Autres", items: [

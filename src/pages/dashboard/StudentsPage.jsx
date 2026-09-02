@@ -14,6 +14,7 @@ import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { createParentInvitation } from "../../lib/invitations";
 import { generateMatricule } from "../../lib/students";
+import { exportToCsv } from "../../lib/csv";
 import { IconPlus, IconUsers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
@@ -64,13 +65,28 @@ export default function StudentsPage() {
         <p className="text-sm text-ink-soft">
           {students.length} élève{students.length > 1 ? "s" : ""} inscrit{students.length > 1 ? "s" : ""}
         </p>
-        <button
-          onClick={() => { setEditing(null); setShowForm((v) => !v); }}
-          className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
-        >
-          <IconPlus className="w-4 h-4" />
-          Nouvel élève
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportToCsv("eleves-klasso", students.map((s) => ({
+              Matricule: s.matricule || "",
+              Nom: s.fullName,
+              Classe: s.classLabel || "",
+              "Date de naissance": s.birthDate || "",
+              Tuteur: s.guardianName || "",
+              "Téléphone tuteur": s.guardianPhone || "",
+            })))}
+            className="text-xs text-indigo-600 border border-indigo-200 rounded-md px-3 py-2"
+          >
+            Exporter en CSV
+          </button>
+          <button
+            onClick={() => { setEditing(null); setShowForm((v) => !v); }}
+            className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
+          >
+            <IconPlus className="w-4 h-4" />
+            Nouvel élève
+          </button>
+        </div>
       </div>
 
       {(showForm || editing) && (
@@ -176,6 +192,8 @@ function StudentForm({ schoolId, classes, editing, onDone }) {
     birthDate: editing?.birthDate || "",
     guardianName: editing?.guardianName || "",
     guardianPhone: editing?.guardianPhone || "",
+    annualFees: editing?.annualFees ?? "",
+    discountPercent: editing?.discountPercent ?? "",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -187,12 +205,17 @@ function StudentForm({ schoolId, classes, editing, onDone }) {
     e.preventDefault();
     setSubmitting(true);
     try {
+      const payload = {
+        ...form,
+        annualFees: form.annualFees === "" ? 0 : Number(form.annualFees),
+        discountPercent: form.discountPercent === "" ? 0 : Number(form.discountPercent),
+      };
       if (editing) {
-        await updateDoc(doc(db, "schools", schoolId, "students", editing.id), form);
+        await updateDoc(doc(db, "schools", schoolId, "students", editing.id), payload);
       } else {
         const matricule = await generateMatricule(schoolId);
         await addDoc(collection(db, "schools", schoolId, "students"), {
-          ...form,
+          ...payload,
           matricule,
           createdAt: serverTimestamp(),
         });
@@ -241,6 +264,25 @@ function StudentForm({ schoolId, classes, editing, onDone }) {
         </FormField>
         <FormField label="Téléphone du tuteur">
           <TextInput value={form.guardianPhone} onChange={update("guardianPhone")} />
+        </FormField>
+        <FormField label="Frais annuels (FCFA)">
+          <TextInput
+            type="number"
+            min="0"
+            value={form.annualFees}
+            onChange={update("annualFees")}
+            placeholder="Ex : 150000"
+          />
+        </FormField>
+        <FormField label="Réduction / bourse (%)">
+          <TextInput
+            type="number"
+            min="0"
+            max="100"
+            value={form.discountPercent}
+            onChange={update("discountPercent")}
+            placeholder="0"
+          />
         </FormField>
       </div>
 
