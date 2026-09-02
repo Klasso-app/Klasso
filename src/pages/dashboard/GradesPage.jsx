@@ -209,14 +209,15 @@ export default function GradesPage() {
       )}
 
       {classId && (
-        <ClassAverages schoolId={schoolId} school={school} students={classStudents} />
+        <ClassAverages schoolId={schoolId} school={school} students={classStudents} classId={classId} />
       )}
     </div>
   );
 }
 
-function ClassAverages({ schoolId, school, students }) {
+function ClassAverages({ schoolId, school, students, classId }) {
   const [grades, setGrades] = useState([]);
+  const [appreciations, setAppreciations] = useState({});
   const [bulletinTerm, setBulletinTerm] = useState("Toutes les périodes");
 
   useEffect(() => {
@@ -226,7 +227,40 @@ function ClassAverages({ schoolId, school, students }) {
     return unsub;
   }, [schoolId]);
 
+  const appreciationDocId = classId && bulletinTerm !== "Toutes les périodes"
+    ? `${classId}__${slugify(bulletinTerm)}`
+    : null;
+
+  useEffect(() => {
+    if (!appreciationDocId) {
+      setAppreciations({});
+      return;
+    }
+    getDoc(doc(db, "schools", schoolId, "appreciations", appreciationDocId)).then((snap) => {
+      setAppreciations(snap.exists() ? snap.data().texts || {} : {});
+    });
+  }, [appreciationDocId, schoolId]);
+
+  async function saveAppreciation(studentId, text) {
+    if (!appreciationDocId) return;
+    const next = { ...appreciations, [studentId]: text };
+    setAppreciations(next);
+    await setDoc(
+      doc(db, "schools", schoolId, "appreciations", appreciationDocId),
+      { classId, term: bulletinTerm, texts: next, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  }
+
   if (students.length === 0) return null;
+
+  const relevantGrades = bulletinTerm === "Toutes les périodes"
+    ? grades
+    : grades.filter((g) => g.term === bulletinTerm);
+
+  const ranked = students
+    .map((s) => ({ student: s, average: averageForStudent(relevantGrades, s.id) }))
+    .sort((a, b) => (b.average ?? -1) - (a.average ?? -1));
 
   return (
     <div className="rounded-xl border border-line bg-surface">
@@ -243,37 +277,64 @@ function ClassAverages({ schoolId, school, students }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-ink-soft border-t border-line">
+              <th className="px-6 py-3 font-medium">Rang</th>
               <th className="px-6 py-3 font-medium">Élève</th>
               <th className="px-6 py-3 font-medium">Moyenne pondérée</th>
+              {appreciationDocId && <th className="px-6 py-3 font-medium">Appréciation</th>}
               <th className="px-6 py-3 font-medium">Bulletin</th>
             </tr>
           </thead>
           <tbody>
-            {students.map((s) => {
-              const relevant = bulletinTerm === "Toutes les périodes"
-                ? grades
-                : grades.filter((g) => g.term === bulletinTerm);
-              const avg = averageForStudent(relevant, s.id);
-              return (
-                <tr key={s.id} className="border-t border-line">
-                  <td className="px-6 py-3 text-ink">{s.fullName}</td>
-                  <td className="px-6 py-3 text-ink-soft">{avg === null ? "—" : `${avg} / 20`}</td>
+            {ranked.map(({ student: s, average: avg }, index) => (
+              <tr key={s.id} className="border-t border-line">
+                <td className="px-6 py-3 text-ink-soft">{avg === null ? "—" : index + 1}</td>
+                <td className="px-6 py-3 text-ink">{s.fullName}</td>
+                <td className="px-6 py-3 text-ink-soft">{avg === null ? "—" : `${avg} / 20`}</td>
+                {appreciationDocId && (
                   <td className="px-6 py-3">
-                    <button
-                      onClick={() => downloadBulletin({ school, student: s, grades, term: bulletinTerm })}
-                      className="flex items-center gap-1.5 text-xs text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1.5"
-                    >
-                      <IconFile className="w-3.5 h-3.5" />
-                      Télécharger
-                    </button>
+                    <AppreciationInput
+                      value={appreciations[s.id] || ""}
+                      onSave={(text) => saveAppreciation(s.id, text)}
+                    />
                   </td>
-                </tr>
-              );
-            })}
+                )}
+                <td className="px-6 py-3">
+                  <button
+                    onClick={() => downloadBulletin({
+                      school,
+                      student: s,
+                      grades,
+                      term: bulletinTerm,
+                      rank: avg === null ? null : index + 1,
+                      totalStudents: students.length,
+                      appreciation: appreciations[s.id] || "",
+                    })}
+                    className="flex items-center gap-1.5 text-xs text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1.5"
+                  >
+                    <IconFile className="w-3.5 h-3.5" />
+                    Télécharger
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+function AppreciationInput({ value, onSave }) {
+  const [text, setText] = useState(value);
+
+  return (
+    <input
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => { if (text !== value) onSave(text); }}
+      placeholder="Ajouter..."
+      className="w-40 text-xs rounded-md border border-line px-2 py-1.5 focus:border-indigo-500"
+    />
   );
 }
 

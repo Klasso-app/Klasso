@@ -13,6 +13,7 @@ import {
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { createParentInvitation } from "../../lib/invitations";
+import { generateMatricule } from "../../lib/students";
 import { IconPlus, IconUsers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
@@ -88,6 +89,7 @@ export default function StudentsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-ink-soft">
+                  <th className="px-6 py-3 font-medium">Matricule</th>
                   <th className="px-6 py-3 font-medium">Nom complet</th>
                   <th className="px-6 py-3 font-medium">Classe</th>
                   <th className="px-6 py-3 font-medium">Date de naissance</th>
@@ -99,6 +101,7 @@ export default function StudentsPage() {
               <tbody>
                 {students.map((s) => (
                   <tr key={s.id} className="border-t border-line">
+                    <td className="px-6 py-3 text-ink-soft font-mono text-xs">{s.matricule || "—"}</td>
                     <td className="px-6 py-3 text-ink">{s.fullName}</td>
                     <td className="px-6 py-3 text-ink-soft">{s.classLabel || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{s.birthDate || "—"}</td>
@@ -187,8 +190,10 @@ function StudentForm({ schoolId, classes, editing, onDone }) {
       if (editing) {
         await updateDoc(doc(db, "schools", schoolId, "students", editing.id), form);
       } else {
+        const matricule = await generateMatricule(schoolId);
         await addDoc(collection(db, "schools", schoolId, "students"), {
           ...form,
+          matricule,
           createdAt: serverTimestamp(),
         });
       }

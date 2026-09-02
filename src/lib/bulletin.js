@@ -3,7 +3,7 @@ import { averageForStudent, subjectBreakdownForStudent } from "./grades";
 // jsPDF est chargé à la demande (et non au démarrage de l'app) pour ne pas
 // alourdir le chargement initial du dashboard, alors que peu de visites
 // génèrent réellement un bulletin.
-export async function downloadBulletin({ school, student, grades, term }) {
+export async function downloadBulletin({ school, student, grades, term, rank, totalStudents, appreciation }) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const marginX = 20;
@@ -93,7 +93,26 @@ export async function downloadBulletin({ school, student, grades, term }) {
   doc.text("Moyenne générale :", marginX, y);
   doc.text(average === null ? "—" : `${average} / 20`, 140, y);
 
-  y += 20;
+  if (rank) {
+    y += 8;
+    doc.text("Rang :", marginX, y);
+    doc.text(`${rank}${rank === 1 ? "er" : "ème"} / ${totalStudents}`, 140, y);
+  }
+
+  if (appreciation) {
+    y += 12;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("Appréciation :", marginX, y);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const lines = doc.splitTextToSize(appreciation, 170);
+    doc.text(lines, marginX, y);
+    y += lines.length * 5;
+  }
+
+  y += 16;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(150, 150, 150);
