@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import {
   collection,
   addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
   onSnapshot,
   query,
   orderBy,
@@ -22,6 +25,7 @@ export default function StudentsPage() {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
 
   useEffect(() => {
     if (!schoolId) return;
@@ -43,6 +47,16 @@ export default function StudentsPage() {
     };
   }, [schoolId]);
 
+  async function handleDelete(student) {
+    if (!window.confirm(`Supprimer définitivement le dossier de ${student.fullName} ?`)) return;
+    await deleteDoc(doc(db, "schools", schoolId, "students", student.id));
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditing(null);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -50,7 +64,7 @@ export default function StudentsPage() {
           {students.length} élève{students.length > 1 ? "s" : ""} inscrit{students.length > 1 ? "s" : ""}
         </p>
         <button
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => { setEditing(null); setShowForm((v) => !v); }}
           className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
         >
           <IconPlus className="w-4 h-4" />
@@ -58,8 +72,8 @@ export default function StudentsPage() {
         </button>
       </div>
 
-      {showForm && (
-        <NewStudentForm schoolId={schoolId} classes={classes} onDone={() => setShowForm(false)} />
+      {(showForm || editing) && (
+        <StudentForm schoolId={schoolId} classes={classes} editing={editing} onDone={closeForm} />
       )}
 
       <div className="rounded-xl border border-line bg-surface">
@@ -79,6 +93,7 @@ export default function StudentsPage() {
                   <th className="px-6 py-3 font-medium">Date de naissance</th>
                   <th className="px-6 py-3 font-medium">Contact tuteur</th>
                   <th className="px-6 py-3 font-medium">Compte parent</th>
+                  <th className="px-6 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
@@ -90,6 +105,22 @@ export default function StudentsPage() {
                     <td className="px-6 py-3 text-ink-soft">{s.guardianPhone || "—"}</td>
                     <td className="px-6 py-3">
                       <ParentCodeCell schoolId={schoolId} student={s} />
+                    </td>
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => { setShowForm(false); setEditing(s); }}
+                          className="text-xs text-indigo-600"
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          onClick={() => handleDelete(s)}
+                          className="text-xs text-danger"
+                        >
+                          Supprimer
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -135,13 +166,13 @@ function ParentCodeCell({ schoolId, student }) {
   );
 }
 
-function NewStudentForm({ schoolId, classes, onDone }) {
+function StudentForm({ schoolId, classes, editing, onDone }) {
   const [form, setForm] = useState({
-    fullName: "",
-    classLabel: "",
-    birthDate: "",
-    guardianName: "",
-    guardianPhone: "",
+    fullName: editing?.fullName || "",
+    classLabel: editing?.classLabel || "",
+    birthDate: editing?.birthDate || "",
+    guardianName: editing?.guardianName || "",
+    guardianPhone: editing?.guardianPhone || "",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -153,11 +184,14 @@ function NewStudentForm({ schoolId, classes, onDone }) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await addDoc(collection(db, "schools", schoolId, "students"), {
-        ...form,
-        createdAt: serverTimestamp(),
-      });
-      setForm({ fullName: "", classLabel: "", birthDate: "", guardianName: "", guardianPhone: "" });
+      if (editing) {
+        await updateDoc(doc(db, "schools", schoolId, "students", editing.id), form);
+      } else {
+        await addDoc(collection(db, "schools", schoolId, "students"), {
+          ...form,
+          createdAt: serverTimestamp(),
+        });
+      }
       onDone();
     } finally {
       setSubmitting(false);
@@ -169,7 +203,9 @@ function NewStudentForm({ schoolId, classes, onDone }) {
       onSubmit={handleSubmit}
       className="rounded-xl border border-line bg-surface p-6 flex flex-col gap-4"
     >
-      <h2 className="font-display text-base text-ink">Inscrire un élève</h2>
+      <h2 className="font-display text-base text-ink">
+        {editing ? "Modifier l'élève" : "Inscrire un élève"}
+      </h2>
 
       <div className="grid sm:grid-cols-2 gap-4">
         <FormField label="Nom complet de l'élève">
@@ -216,7 +252,7 @@ function NewStudentForm({ schoolId, classes, onDone }) {
           disabled={submitting}
           className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60"
         >
-          {submitting ? "Enregistrement" : "Enregistrer l'élève"}
+          {submitting ? "Enregistrement" : editing ? "Enregistrer les modifications" : "Enregistrer l'élève"}
         </button>
         <button type="button" onClick={onDone} className="text-sm text-ink-soft px-4 py-2.5">
           Annuler

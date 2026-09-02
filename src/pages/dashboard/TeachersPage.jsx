@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import {
   collection,
   addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
   onSnapshot,
   query,
   orderBy,
@@ -20,6 +23,7 @@ export default function TeachersPage() {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
 
   useEffect(() => {
     if (!schoolId) return;
@@ -34,6 +38,16 @@ export default function TeachersPage() {
     return unsub;
   }, [schoolId]);
 
+  async function handleDelete(teacher) {
+    if (!window.confirm(`Supprimer ${teacher.fullName} de la liste des enseignants ?`)) return;
+    await deleteDoc(doc(db, "schools", schoolId, "teachers", teacher.id));
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditing(null);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -41,7 +55,7 @@ export default function TeachersPage() {
           {teachers.length} enseignant{teachers.length > 1 ? "s" : ""}
         </p>
         <button
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => { setEditing(null); setShowForm((v) => !v); }}
           className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
         >
           <IconPlus className="w-4 h-4" />
@@ -49,7 +63,9 @@ export default function TeachersPage() {
         </button>
       </div>
 
-      {showForm && <NewTeacherForm schoolId={schoolId} onDone={() => setShowForm(false)} />}
+      {(showForm || editing) && (
+        <TeacherForm schoolId={schoolId} editing={editing} onDone={closeForm} />
+      )}
 
       <div className="rounded-xl border border-line bg-surface">
         {!loading && teachers.length === 0 ? (
@@ -67,6 +83,7 @@ export default function TeachersPage() {
                   <th className="px-6 py-3 font-medium">Matière(s)</th>
                   <th className="px-6 py-3 font-medium">Téléphone</th>
                   <th className="px-6 py-3 font-medium">E-mail</th>
+                  <th className="px-6 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
@@ -76,6 +93,19 @@ export default function TeachersPage() {
                     <td className="px-6 py-3 text-ink-soft">{t.subjects || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{t.phone || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{t.email || "—"}</td>
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => { setShowForm(false); setEditing(t); }}
+                          className="text-xs text-indigo-600"
+                        >
+                          Modifier
+                        </button>
+                        <button onClick={() => handleDelete(t)} className="text-xs text-danger">
+                          Supprimer
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -87,8 +117,13 @@ export default function TeachersPage() {
   );
 }
 
-function NewTeacherForm({ schoolId, onDone }) {
-  const [form, setForm] = useState({ fullName: "", subjects: "", phone: "", email: "" });
+function TeacherForm({ schoolId, editing, onDone }) {
+  const [form, setForm] = useState({
+    fullName: editing?.fullName || "",
+    subjects: editing?.subjects || "",
+    phone: editing?.phone || "",
+    email: editing?.email || "",
+  });
   const [submitting, setSubmitting] = useState(false);
 
   function update(field) {
@@ -99,11 +134,14 @@ function NewTeacherForm({ schoolId, onDone }) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await addDoc(collection(db, "schools", schoolId, "teachers"), {
-        ...form,
-        createdAt: serverTimestamp(),
-      });
-      setForm({ fullName: "", subjects: "", phone: "", email: "" });
+      if (editing) {
+        await updateDoc(doc(db, "schools", schoolId, "teachers", editing.id), form);
+      } else {
+        await addDoc(collection(db, "schools", schoolId, "teachers"), {
+          ...form,
+          createdAt: serverTimestamp(),
+        });
+      }
       onDone();
     } finally {
       setSubmitting(false);
@@ -112,7 +150,9 @@ function NewTeacherForm({ schoolId, onDone }) {
 
   return (
     <form onSubmit={handleSubmit} className="rounded-xl border border-line bg-surface p-6 flex flex-col gap-4">
-      <h2 className="font-display text-base text-ink">Ajouter un enseignant</h2>
+      <h2 className="font-display text-base text-ink">
+        {editing ? "Modifier l'enseignant" : "Ajouter un enseignant"}
+      </h2>
 
       <div className="grid sm:grid-cols-2 gap-4">
         <FormField label="Nom complet">
@@ -139,7 +179,7 @@ function NewTeacherForm({ schoolId, onDone }) {
           disabled={submitting}
           className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60"
         >
-          {submitting ? "Enregistrement" : "Enregistrer"}
+          {submitting ? "Enregistrement" : editing ? "Enregistrer les modifications" : "Enregistrer"}
         </button>
         <button type="button" onClick={onDone} className="text-sm text-ink-soft px-4 py-2.5">
           Annuler

@@ -10,14 +10,15 @@ import {
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { averageForStudent } from "../../lib/grades";
+import { downloadBulletin } from "../../lib/bulletin";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { Select, TextInput } from "../../components/auth/FormField";
-import { IconChart } from "../../components/icons";
+import { IconChart, IconFile } from "../../components/icons";
 
 const TERMS = ["Trimestre 1", "Trimestre 2", "Trimestre 3"];
 
 export default function GradesPage() {
-  const { profile } = useAuth();
+  const { profile, school } = useAuth();
   const schoolId = profile?.schoolId;
 
   const [classes, setClasses] = useState([]);
@@ -27,6 +28,7 @@ export default function GradesPage() {
   const [classId, setClassId] = useState("");
   const [subject, setSubject] = useState("");
   const [term, setTerm] = useState(TERMS[0]);
+  const [coefficient, setCoefficient] = useState(1);
   const [scores, setScores] = useState({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -63,7 +65,13 @@ export default function GradesPage() {
       return;
     }
     getDoc(doc(db, "schools", schoolId, "grades", gradeDocId)).then((snap) => {
-      setScores(snap.exists() ? snap.data().scores || {} : {});
+      if (snap.exists()) {
+        setScores(snap.data().scores || {});
+        setCoefficient(snap.data().coefficient || 1);
+      } else {
+        setScores({});
+        setCoefficient(1);
+      }
     });
   }, [gradeDocId, schoolId]);
 
@@ -82,6 +90,7 @@ export default function GradesPage() {
           className: selectedClass?.name || "",
           subject,
           term,
+          coefficient: Number(coefficient) || 1,
           scores,
           updatedAt: serverTimestamp(),
         },
@@ -109,7 +118,7 @@ export default function GradesPage() {
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-line bg-surface p-6">
         <h2 className="font-display text-base text-ink mb-4">Sélectionner une évaluation</h2>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-4 gap-4">
           <FormField label="Classe">
             <Select value={classId} onChange={(e) => setClassId(e.target.value)}>
               <option value="">Choisir une classe</option>
@@ -129,6 +138,15 @@ export default function GradesPage() {
             <Select value={term} onChange={(e) => setTerm(e.target.value)}>
               {TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
             </Select>
+          </FormField>
+          <FormField label="Coefficient">
+            <TextInput
+              type="number"
+              min="1"
+              step="1"
+              value={coefficient}
+              onChange={(e) => setCoefficient(e.target.value)}
+            />
           </FormField>
         </div>
       </div>
@@ -191,14 +209,15 @@ export default function GradesPage() {
       )}
 
       {classId && (
-        <ClassAverages schoolId={schoolId} students={classStudents} />
+        <ClassAverages schoolId={schoolId} school={school} students={classStudents} />
       )}
     </div>
   );
 }
 
-function ClassAverages({ schoolId, students }) {
+function ClassAverages({ schoolId, school, students }) {
   const [grades, setGrades] = useState([]);
+  const [bulletinTerm, setBulletinTerm] = useState("Toutes les périodes");
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "schools", schoolId, "grades"), (snap) =>
@@ -211,24 +230,43 @@ function ClassAverages({ schoolId, students }) {
 
   return (
     <div className="rounded-xl border border-line bg-surface">
-      <div className="px-6 py-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-5">
         <h2 className="font-display text-base text-ink">Moyennes générales de la classe</h2>
+        <div className="w-full sm:w-56">
+          <Select value={bulletinTerm} onChange={(e) => setBulletinTerm(e.target.value)}>
+            <option>Toutes les périodes</option>
+            {TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </Select>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-ink-soft border-t border-line">
               <th className="px-6 py-3 font-medium">Élève</th>
-              <th className="px-6 py-3 font-medium">Moyenne (toutes matières)</th>
+              <th className="px-6 py-3 font-medium">Moyenne pondérée</th>
+              <th className="px-6 py-3 font-medium">Bulletin</th>
             </tr>
           </thead>
           <tbody>
             {students.map((s) => {
-              const avg = averageForStudent(grades, s.id);
+              const relevant = bulletinTerm === "Toutes les périodes"
+                ? grades
+                : grades.filter((g) => g.term === bulletinTerm);
+              const avg = averageForStudent(relevant, s.id);
               return (
                 <tr key={s.id} className="border-t border-line">
                   <td className="px-6 py-3 text-ink">{s.fullName}</td>
                   <td className="px-6 py-3 text-ink-soft">{avg === null ? "—" : `${avg} / 20`}</td>
+                  <td className="px-6 py-3">
+                    <button
+                      onClick={() => downloadBulletin({ school, student: s, grades, term: bulletinTerm })}
+                      className="flex items-center gap-1.5 text-xs text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1.5"
+                    >
+                      <IconFile className="w-3.5 h-3.5" />
+                      Télécharger
+                    </button>
+                  </td>
                 </tr>
               );
             })}

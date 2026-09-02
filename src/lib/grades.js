@@ -1,12 +1,11 @@
 // Calcul des moyennes à partir des notes stockées dans
 // schools/{schoolId}/grades. Chaque document représente une évaluation
-// (une classe + une matière + un trimestre) et contient les notes de tous
-// les élèves de cette classe pour cette évaluation :
+// (une classe + une matière + un trimestre + un coefficient) et contient
+// les notes de tous les élèves de cette classe pour cette évaluation :
 //
-//   { classId, className, subject, term, scores: { [studentId]: number } }
+//   { classId, className, subject, term, coefficient, scores: { [studentId]: number } }
 //
-// MVP : moyenne non pondérée (sans coefficients par matière). Les
-// coefficients pourront être ajoutés plus tard sans changer ce modèle.
+// La moyenne est pondérée par les coefficients de chaque matière.
 
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
@@ -17,13 +16,15 @@ export async function fetchAllGrades(schoolId) {
 }
 
 export function averageForStudent(grades, studentId) {
-  const scores = grades
-    .map((g) => g.scores?.[studentId])
-    .filter((v) => typeof v === "number");
+  const entries = grades
+    .filter((g) => typeof g.scores?.[studentId] === "number")
+    .map((g) => ({ score: g.scores[studentId], coefficient: g.coefficient || 1 }));
 
-  if (scores.length === 0) return null;
-  const sum = scores.reduce((a, b) => a + b, 0);
-  return Math.round((sum / scores.length) * 100) / 100;
+  if (entries.length === 0) return null;
+  const totalCoef = entries.reduce((a, e) => a + e.coefficient, 0);
+  const weightedSum = entries.reduce((a, e) => a + e.score * e.coefficient, 0);
+  if (totalCoef === 0) return null;
+  return Math.round((weightedSum / totalCoef) * 100) / 100;
 }
 
 export function schoolAverage(grades, studentIds) {
@@ -34,4 +35,19 @@ export function schoolAverage(grades, studentIds) {
   if (averages.length === 0) return null;
   const sum = averages.reduce((a, b) => a + b, 0);
   return Math.round((sum / averages.length) * 100) / 100;
+}
+
+// Détail matière par matière pour un élève, utilisé pour générer le
+// bulletin. Regroupe par matière + trimestre (au cas où plusieurs
+// évaluations existeraient pour la même combinaison).
+export function subjectBreakdownForStudent(grades, studentId) {
+  return grades
+    .filter((g) => typeof g.scores?.[studentId] === "number")
+    .map((g) => ({
+      subject: g.subject,
+      term: g.term,
+      score: g.scores[studentId],
+      coefficient: g.coefficient || 1,
+    }))
+    .sort((a, b) => a.subject.localeCompare(b.subject));
 }

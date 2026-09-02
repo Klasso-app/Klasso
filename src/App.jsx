@@ -17,10 +17,9 @@ import ClassesPage from "./pages/dashboard/ClassesPage";
 import GradesPage from "./pages/dashboard/GradesPage";
 import FinancesPage from "./pages/dashboard/FinancesPage";
 import SchedulePage from "./pages/dashboard/SchedulePage";
+import InscriptionsPage from "./pages/dashboard/InscriptionsPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import ParentHomePage from "./pages/dashboard/ParentHomePage";
-import ComingSoonPage from "./pages/dashboard/ComingSoonPage";
-import { IconClipboard, IconUsers } from "./components/icons";
 
 export default function App() {
   const [booting, setBooting] = useState(true);
@@ -60,7 +59,7 @@ export default function App() {
             <Route path="mes-enfants" element={<Page title="Mes enfants"><ParentHomePage /></Page>} />
             <Route
               path="inscriptions"
-              element={<Page title="Inscriptions"><ComingSoonPage icon={IconClipboard} title="Suivi des inscriptions" /></Page>}
+              element={<Page title="Inscriptions"><InscriptionsPage /></Page>}
             />
             <Route
               path="parametres"

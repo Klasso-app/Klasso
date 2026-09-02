@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import {
   collection,
   addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
   onSnapshot,
   query,
   orderBy,
@@ -22,6 +25,7 @@ export default function ClassesPage() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
 
   useEffect(() => {
     if (!schoolId) return;
@@ -53,6 +57,20 @@ export default function ClassesPage() {
     return students.filter((s) => s.classLabel === className).length;
   }
 
+  async function handleDelete(klass) {
+    const count = studentCount(klass.name);
+    const message = count > 0
+      ? `${count} élève(s) sont actuellement dans « ${klass.name} ». Supprimer la classe ne supprime pas ces élèves, mais elle n'apparaîtra plus dans les listes. Continuer ?`
+      : `Supprimer la classe « ${klass.name} » ?`;
+    if (!window.confirm(message)) return;
+    await deleteDoc(doc(db, "schools", schoolId, "classes", klass.id));
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditing(null);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -60,7 +78,7 @@ export default function ClassesPage() {
           {classes.length} classe{classes.length > 1 ? "s" : ""}
         </p>
         <button
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => { setEditing(null); setShowForm((v) => !v); }}
           className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
         >
           <IconPlus className="w-4 h-4" />
@@ -68,8 +86,8 @@ export default function ClassesPage() {
         </button>
       </div>
 
-      {showForm && (
-        <NewClassForm schoolId={schoolId} teachers={teachers} onDone={() => setShowForm(false)} />
+      {(showForm || editing) && (
+        <ClassForm schoolId={schoolId} teachers={teachers} editing={editing} onDone={closeForm} />
       )}
 
       <div className="rounded-xl border border-line bg-surface">
@@ -88,6 +106,7 @@ export default function ClassesPage() {
                   <th className="px-6 py-3 font-medium">Niveau</th>
                   <th className="px-6 py-3 font-medium">Enseignant principal</th>
                   <th className="px-6 py-3 font-medium">Effectif</th>
+                  <th className="px-6 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
@@ -97,6 +116,19 @@ export default function ClassesPage() {
                     <td className="px-6 py-3 text-ink-soft">{c.level || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{c.headTeacherName || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{studentCount(c.name)}</td>
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => { setShowForm(false); setEditing(c); }}
+                          className="text-xs text-indigo-600"
+                        >
+                          Modifier
+                        </button>
+                        <button onClick={() => handleDelete(c)} className="text-xs text-danger">
+                          Supprimer
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -108,8 +140,12 @@ export default function ClassesPage() {
   );
 }
 
-function NewClassForm({ schoolId, teachers, onDone }) {
-  const [form, setForm] = useState({ name: "", level: "", headTeacherId: "" });
+function ClassForm({ schoolId, teachers, editing, onDone }) {
+  const [form, setForm] = useState({
+    name: editing?.name || "",
+    level: editing?.level || "",
+    headTeacherId: editing?.headTeacherId || "",
+  });
   const [submitting, setSubmitting] = useState(false);
 
   function update(field) {
@@ -121,14 +157,20 @@ function NewClassForm({ schoolId, teachers, onDone }) {
     setSubmitting(true);
     try {
       const headTeacher = teachers.find((t) => t.id === form.headTeacherId);
-      await addDoc(collection(db, "schools", schoolId, "classes"), {
+      const payload = {
         name: form.name,
         level: form.level,
         headTeacherId: form.headTeacherId || null,
         headTeacherName: headTeacher?.fullName || "",
-        createdAt: serverTimestamp(),
-      });
-      setForm({ name: "", level: "", headTeacherId: "" });
+      };
+      if (editing) {
+        await updateDoc(doc(db, "schools", schoolId, "classes", editing.id), payload);
+      } else {
+        await addDoc(collection(db, "schools", schoolId, "classes"), {
+          ...payload,
+          createdAt: serverTimestamp(),
+        });
+      }
       onDone();
     } finally {
       setSubmitting(false);
@@ -137,7 +179,9 @@ function NewClassForm({ schoolId, teachers, onDone }) {
 
   return (
     <form onSubmit={handleSubmit} className="rounded-xl border border-line bg-surface p-6 flex flex-col gap-4">
-      <h2 className="font-display text-base text-ink">Créer une classe</h2>
+      <h2 className="font-display text-base text-ink">
+        {editing ? "Modifier la classe" : "Créer une classe"}
+      </h2>
 
       <div className="grid sm:grid-cols-2 gap-4">
         <FormField label="Nom de la classe">
@@ -171,7 +215,7 @@ function NewClassForm({ schoolId, teachers, onDone }) {
           disabled={submitting}
           className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60"
         >
-          {submitting ? "Création" : "Créer la classe"}
+          {submitting ? "Enregistrement" : editing ? "Enregistrer les modifications" : "Créer la classe"}
         </button>
         <button type="button" onClick={onDone} className="text-sm text-ink-soft px-4 py-2.5">
           Annuler
