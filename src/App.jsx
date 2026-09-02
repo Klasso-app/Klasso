@@ -21,6 +21,8 @@ import InscriptionsPage from "./pages/dashboard/InscriptionsPage";
 import AbsencesPage from "./pages/dashboard/AbsencesPage";
 import AnnouncementsPage from "./pages/dashboard/AnnouncementsPage";
 import StatsPage from "./pages/dashboard/StatsPage";
+import CalendarPage from "./pages/dashboard/CalendarPage";
+import MessagesPage from "./pages/dashboard/MessagesPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import ParentHomePage from "./pages/dashboard/ParentHomePage";
 
@@ -61,6 +63,8 @@ export default function App() {
             <Route path="absences" element={<Page title="Absences"><AbsencesPage /></Page>} />
             <Route path="annonces" element={<Page title="Annonces"><AnnouncementsPage /></Page>} />
             <Route path="statistiques" element={<Page title="Statistiques"><StatsPage /></Page>} />
+            <Route path="calendrier" element={<Page title="Calendrier"><CalendarPage /></Page>} />
+            <Route path="messagerie" element={<Page title="Messagerie"><MessagesPage /></Page>} />
             <Route path="mes-classes" element={<Page title="Mes classes"><ClassesPage /></Page>} />
             <Route path="mes-enfants" element={<Page title="Mes enfants"><ParentHomePage /></Page>} />
             <Route

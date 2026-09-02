@@ -21,7 +21,9 @@ export const navByRole = {
       { to: "/app/absences", label: "Absences", icon: IconCalendar },
       { to: "/app/finances", label: "Finances", icon: IconWallet },
       { to: "/app/statistiques", label: "Statistiques", icon: IconChart },
+      { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
       { to: "/app/annonces", label: "Annonces", icon: IconMessage },
+      { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
     ]},
     { section: "Autres", items: [
       { to: "/app/parametres", label: "Paramètres de l'école", icon: IconSettings },
@@ -33,7 +35,9 @@ export const navByRole = {
       { to: "/app/eleves", label: "Élèves", icon: IconUsers },
       { to: "/app/inscriptions", label: "Inscriptions", icon: IconClipboard },
       { to: "/app/absences", label: "Absences", icon: IconCalendar },
+      { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
       { to: "/app/annonces", label: "Annonces", icon: IconMessage },
+      { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
     ]},
     { section: "Autres", items: [
       { to: "/app/parametres", label: "Paramètres de l'école", icon: IconSettings },
@@ -46,7 +50,9 @@ export const navByRole = {
       { to: "/app/notes", label: "Notes", icon: IconChart },
       { to: "/app/absences", label: "Absences", icon: IconCalendar },
       { to: "/app/emploi-du-temps", label: "Emploi du temps", icon: IconCalendar },
+      { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
       { to: "/app/annonces", label: "Annonces", icon: IconMessage },
+      { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
     ]},
   ],
   parent: [
@@ -54,7 +60,9 @@ export const navByRole = {
       { to: "/app", label: "Tableau de bord", icon: IconHome, end: true },
       { to: "/app/mes-enfants", label: "Mes enfants", icon: IconUsers },
       { to: "/app/emploi-du-temps", label: "Emploi du temps", icon: IconCalendar },
+      { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
       { to: "/app/annonces", label: "Annonces", icon: IconMessage },
+      { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
     ]},
   ],
 };

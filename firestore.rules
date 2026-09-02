@@ -43,7 +43,10 @@ service cloud.firestore {
       allow update: if canEditSchool(schoolId);
 
       // Données pédagogiques : accessibles à tout membre de l'établissement.
-      match /{collection}/{docId} {
+      // Le wildcard récursif (au lieu d'un seul niveau) couvre aussi les
+      // sous-collections comme schools/{id}/conversations/{uid}/messages,
+      // utilisées par la messagerie.
+      match /{document=**} {
         allow read, write: if belongsToSchool(schoolId);
       }
     }

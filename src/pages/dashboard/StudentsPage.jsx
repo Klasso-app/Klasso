@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   collection,
   addDoc,
@@ -15,9 +15,12 @@ import { useAuth } from "../../context/AuthContext";
 import { createParentInvitation } from "../../lib/invitations";
 import { generateMatricule } from "../../lib/students";
 import { exportToCsv } from "../../lib/csv";
+import { currentSchoolYear, nextSchoolYear } from "../../lib/schoolYear";
 import { IconPlus, IconUsers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
+
+const FILTERS = ["Actifs", "Anciens / transférés", "Tous"];
 
 export default function StudentsPage() {
   const { profile } = useAuth();
@@ -28,6 +31,8 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [reenrolling, setReenrolling] = useState(null);
+  const [filter, setFilter] = useState(FILTERS[0]);
 
   useEffect(() => {
     if (!schoolId) return;
@@ -49,9 +54,24 @@ export default function StudentsPage() {
     };
   }, [schoolId]);
 
+  const visibleStudents = useMemo(() => {
+    if (filter === "Tous") return students;
+    if (filter === "Actifs") return students.filter((s) => (s.status || "Actif") === "Actif");
+    return students.filter((s) => (s.status || "Actif") !== "Actif");
+  }, [students, filter]);
+
   async function handleDelete(student) {
     if (!window.confirm(`Supprimer définitivement le dossier de ${student.fullName} ?`)) return;
     await deleteDoc(doc(db, "schools", schoolId, "students", student.id));
+  }
+
+  async function handleTransfer(student) {
+    if (!window.confirm(`Marquer ${student.fullName} comme parti(e) / transféré(e) ? Le dossier reste consultable mais sort des listes actives.`)) return;
+    await updateDoc(doc(db, "schools", schoolId, "students", student.id), { status: "Transféré" });
+  }
+
+  async function handleReactivate(student) {
+    await updateDoc(doc(db, "schools", schoolId, "students", student.id), { status: "Actif" });
   }
 
   function closeForm() {
@@ -61,16 +81,26 @@ export default function StudentsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-ink-soft">
-          {students.length} élève{students.length > 1 ? "s" : ""} inscrit{students.length > 1 ? "s" : ""}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1 rounded-lg border border-line p-1 w-fit">
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`text-xs px-3 py-1.5 rounded-md ${filter === f ? "bg-indigo-50 text-indigo-600 font-medium" : "text-ink-soft"}`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => exportToCsv("eleves-klasso", students.map((s) => ({
+            onClick={() => exportToCsv("eleves-klasso", visibleStudents.map((s) => ({
               Matricule: s.matricule || "",
               Nom: s.fullName,
               Classe: s.classLabel || "",
+              Statut: s.status || "Actif",
+              "Année scolaire": s.schoolYear || "",
               "Date de naissance": s.birthDate || "",
               Tuteur: s.guardianName || "",
               "Téléphone tuteur": s.guardianPhone || "",
@@ -93,11 +123,20 @@ export default function StudentsPage() {
         <StudentForm schoolId={schoolId} classes={classes} editing={editing} onDone={closeForm} />
       )}
 
+      {reenrolling && (
+        <ReenrollForm
+          schoolId={schoolId}
+          classes={classes}
+          student={reenrolling}
+          onDone={() => setReenrolling(null)}
+        />
+      )}
+
       <div className="rounded-xl border border-line bg-surface">
-        {!loading && students.length === 0 ? (
+        {!loading && visibleStudents.length === 0 ? (
           <EmptyState
             icon={IconUsers}
-            title="Aucun élève inscrit"
+            title="Aucun élève dans cette liste"
             text="Utilisez le bouton « Nouvel élève » pour commencer les inscriptions de votre établissement."
           />
         ) : (
@@ -108,41 +147,56 @@ export default function StudentsPage() {
                   <th className="px-6 py-3 font-medium">Matricule</th>
                   <th className="px-6 py-3 font-medium">Nom complet</th>
                   <th className="px-6 py-3 font-medium">Classe</th>
-                  <th className="px-6 py-3 font-medium">Date de naissance</th>
-                  <th className="px-6 py-3 font-medium">Contact tuteur</th>
+                  <th className="px-6 py-3 font-medium">Année</th>
+                  <th className="px-6 py-3 font-medium">Statut</th>
                   <th className="px-6 py-3 font-medium">Compte parent</th>
                   <th className="px-6 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
-                {students.map((s) => (
-                  <tr key={s.id} className="border-t border-line">
-                    <td className="px-6 py-3 text-ink-soft font-mono text-xs">{s.matricule || "—"}</td>
-                    <td className="px-6 py-3 text-ink">{s.fullName}</td>
-                    <td className="px-6 py-3 text-ink-soft">{s.classLabel || "—"}</td>
-                    <td className="px-6 py-3 text-ink-soft">{s.birthDate || "—"}</td>
-                    <td className="px-6 py-3 text-ink-soft">{s.guardianPhone || "—"}</td>
-                    <td className="px-6 py-3">
-                      <ParentCodeCell schoolId={schoolId} student={s} />
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => { setShowForm(false); setEditing(s); }}
-                          className="text-xs text-indigo-600"
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          onClick={() => handleDelete(s)}
-                          className="text-xs text-danger"
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {visibleStudents.map((s) => {
+                  const status = s.status || "Actif";
+                  return (
+                    <tr key={s.id} className="border-t border-line">
+                      <td className="px-6 py-3 text-ink-soft font-mono text-xs">{s.matricule || "—"}</td>
+                      <td className="px-6 py-3 text-ink">{s.fullName}</td>
+                      <td className="px-6 py-3 text-ink-soft">{s.classLabel || "—"}</td>
+                      <td className="px-6 py-3 text-ink-soft">{s.schoolYear || "—"}</td>
+                      <td className="px-6 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-md ${status === "Actif" ? "text-success bg-success-soft" : "text-ink-soft bg-surface-tint"}`}>
+                          {status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3">
+                        <ParentCodeCell schoolId={schoolId} student={s} />
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <button onClick={() => { setShowForm(false); setEditing(s); }} className="text-xs text-indigo-600">
+                            Modifier
+                          </button>
+                          {status === "Actif" ? (
+                            <>
+                              <button onClick={() => setReenrolling(s)} className="text-xs text-indigo-600">
+                                Réinscrire
+                              </button>
+                              <button onClick={() => handleTransfer(s)} className="text-xs text-warning">
+                                Marquer transféré
+                              </button>
+                            </>
+                          ) : (
+                            <button onClick={() => handleReactivate(s)} className="text-xs text-success">
+                              Réactiver
+                            </button>
+                          )}
+                          <button onClick={() => handleDelete(s)} className="text-xs text-danger">
+                            Supprimer
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -185,6 +239,51 @@ function ParentCodeCell({ schoolId, student }) {
   );
 }
 
+function ReenrollForm({ schoolId, classes, student, onDone }) {
+  const [classLabel, setClassLabel] = useState(student.classLabel || "");
+  const [submitting, setSubmitting] = useState(false);
+  const targetYear = nextSchoolYear();
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await updateDoc(doc(db, "schools", schoolId, "students", student.id), {
+        classLabel,
+        schoolYear: targetYear,
+        status: "Actif",
+      });
+      onDone();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-xl border border-line bg-surface p-6 flex flex-col gap-4">
+      <h2 className="font-display text-base text-ink">
+        Réinscrire {student.fullName} pour {targetYear}
+      </h2>
+      <FormField label="Nouvelle classe">
+        {classes.length > 0 ? (
+          <Select required value={classLabel} onChange={(e) => setClassLabel(e.target.value)}>
+            <option value="">Sélectionner une classe</option>
+            {classes.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+          </Select>
+        ) : (
+          <TextInput required value={classLabel} onChange={(e) => setClassLabel(e.target.value)} />
+        )}
+      </FormField>
+      <div className="flex items-center gap-3">
+        <button type="submit" disabled={submitting} className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60">
+          {submitting ? "Enregistrement" : "Confirmer la réinscription"}
+        </button>
+        <button type="button" onClick={onDone} className="text-sm text-ink-soft px-4 py-2.5">Annuler</button>
+      </div>
+    </form>
+  );
+}
+
 function StudentForm({ schoolId, classes, editing, onDone }) {
   const [form, setForm] = useState({
     fullName: editing?.fullName || "",
@@ -217,6 +316,8 @@ function StudentForm({ schoolId, classes, editing, onDone }) {
         await addDoc(collection(db, "schools", schoolId, "students"), {
           ...payload,
           matricule,
+          status: "Actif",
+          schoolYear: currentSchoolYear(),
           createdAt: serverTimestamp(),
         });
       }
