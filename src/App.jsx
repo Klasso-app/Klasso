@@ -23,6 +23,10 @@ import AnnouncementsPage from "./pages/dashboard/AnnouncementsPage";
 import StatsPage from "./pages/dashboard/StatsPage";
 import CalendarPage from "./pages/dashboard/CalendarPage";
 import MessagesPage from "./pages/dashboard/MessagesPage";
+import LibraryPage from "./pages/dashboard/LibraryPage";
+import TransportPage from "./pages/dashboard/TransportPage";
+import CanteenPage from "./pages/dashboard/CanteenPage";
+import LogsPage from "./pages/dashboard/LogsPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import ParentHomePage from "./pages/dashboard/ParentHomePage";
 
@@ -65,6 +69,10 @@ export default function App() {
             <Route path="statistiques" element={<Page title="Statistiques"><StatsPage /></Page>} />
             <Route path="calendrier" element={<Page title="Calendrier"><CalendarPage /></Page>} />
             <Route path="messagerie" element={<Page title="Messagerie"><MessagesPage /></Page>} />
+            <Route path="bibliotheque" element={<Page title="Bibliothèque"><LibraryPage /></Page>} />
+            <Route path="transport" element={<Page title="Transport"><TransportPage /></Page>} />
+            <Route path="cantine" element={<Page title="Cantine"><CanteenPage /></Page>} />
+            <Route path="historique" element={<Page title="Historique"><LogsPage /></Page>} />
             <Route path="mes-classes" element={<Page title="Mes classes"><ClassesPage /></Page>} />
             <Route path="mes-enfants" element={<Page title="Mes enfants"><ParentHomePage /></Page>} />
             <Route

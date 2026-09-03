@@ -16,6 +16,7 @@ import { createParentInvitation } from "../../lib/invitations";
 import { generateMatricule } from "../../lib/students";
 import { exportToCsv } from "../../lib/csv";
 import { currentSchoolYear, nextSchoolYear } from "../../lib/schoolYear";
+import { logAction } from "../../lib/auditLog";
 import { IconPlus, IconUsers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
@@ -23,7 +24,7 @@ import FormField, { TextInput, Select } from "../../components/auth/FormField";
 const FILTERS = ["Actifs", "Anciens / transférés", "Tous"];
 
 export default function StudentsPage() {
-  const { profile } = useAuth();
+  const { profile, firebaseUser } = useAuth();
   const schoolId = profile?.schoolId;
 
   const [students, setStudents] = useState([]);
@@ -63,11 +64,23 @@ export default function StudentsPage() {
   async function handleDelete(student) {
     if (!window.confirm(`Supprimer définitivement le dossier de ${student.fullName} ?`)) return;
     await deleteDoc(doc(db, "schools", schoolId, "students", student.id));
+    logAction(schoolId, {
+      actorUid: firebaseUser?.uid,
+      actorName: profile?.name,
+      action: "Suppression d'un élève",
+      details: student.fullName,
+    });
   }
 
   async function handleTransfer(student) {
     if (!window.confirm(`Marquer ${student.fullName} comme parti(e) / transféré(e) ? Le dossier reste consultable mais sort des listes actives.`)) return;
     await updateDoc(doc(db, "schools", schoolId, "students", student.id), { status: "Transféré" });
+    logAction(schoolId, {
+      actorUid: firebaseUser?.uid,
+      actorName: profile?.name,
+      action: "Élève marqué transféré",
+      details: student.fullName,
+    });
   }
 
   async function handleReactivate(student) {

@@ -12,12 +12,13 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
+import { logAction } from "../../lib/auditLog";
 import { IconPlus, IconLayers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
 export default function ClassesPage() {
-  const { profile } = useAuth();
+  const { profile, firebaseUser } = useAuth();
   const schoolId = profile?.schoolId;
 
   const [classes, setClasses] = useState([]);
@@ -64,6 +65,12 @@ export default function ClassesPage() {
       : `Supprimer la classe « ${klass.name} » ?`;
     if (!window.confirm(message)) return;
     await deleteDoc(doc(db, "schools", schoolId, "classes", klass.id));
+    logAction(schoolId, {
+      actorUid: firebaseUser?.uid,
+      actorName: profile?.name,
+      action: "Suppression d'une classe",
+      details: klass.name,
+    });
   }
 
   function closeForm() {

@@ -8,6 +8,9 @@ import {
   IconCalendar,
   IconChart,
   IconMessage,
+  IconFile,
+  IconMapPin,
+  IconShield,
 } from "../icons";
 
 export const navByRole = {
@@ -24,8 +27,12 @@ export const navByRole = {
       { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
       { to: "/app/annonces", label: "Annonces", icon: IconMessage },
       { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
+      { to: "/app/bibliotheque", label: "Bibliothèque", icon: IconFile },
+      { to: "/app/transport", label: "Transport", icon: IconMapPin },
+      { to: "/app/cantine", label: "Cantine", icon: IconClipboard },
     ]},
     { section: "Autres", items: [
+      { to: "/app/historique", label: "Historique", icon: IconShield },
       { to: "/app/parametres", label: "Paramètres de l'école", icon: IconSettings },
     ]},
   ],
@@ -38,6 +45,8 @@ export const navByRole = {
       { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
       { to: "/app/annonces", label: "Annonces", icon: IconMessage },
       { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
+      { to: "/app/bibliotheque", label: "Bibliothèque", icon: IconFile },
+      { to: "/app/cantine", label: "Cantine", icon: IconClipboard },
     ]},
     { section: "Autres", items: [
       { to: "/app/parametres", label: "Paramètres de l'école", icon: IconSettings },
@@ -53,6 +62,7 @@ export const navByRole = {
       { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
       { to: "/app/annonces", label: "Annonces", icon: IconMessage },
       { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
+      { to: "/app/bibliotheque", label: "Bibliothèque", icon: IconFile },
     ]},
   ],
   parent: [
@@ -63,6 +73,8 @@ export const navByRole = {
       { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
       { to: "/app/annonces", label: "Annonces", icon: IconMessage },
       { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
+      { to: "/app/cantine", label: "Cantine", icon: IconClipboard },
+      { to: "/app/transport", label: "Transport", icon: IconMapPin },
     ]},
   ],
 };

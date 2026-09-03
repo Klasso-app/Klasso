@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { updateSchool } from "../../lib/schools";
+import { logAction } from "../../lib/auditLog";
 import { IconShield } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput } from "../../components/auth/FormField";
 
 export default function SettingsPage() {
-  const { profile, school, refreshSchool } = useAuth();
+  const { profile, school, refreshSchool, firebaseUser } = useAuth();
   const canEdit = profile?.role === "directeur" || profile?.canEditSchoolSettings;
 
   const [form, setForm] = useState({
@@ -43,6 +44,12 @@ export default function SettingsPage() {
     try {
       await updateSchool(school.id, form);
       await refreshSchool();
+      logAction(school.id, {
+        actorUid: firebaseUser?.uid,
+        actorName: profile?.name,
+        action: "Modification des paramètres de l'école",
+        details: form.name,
+      });
       setSaved(true);
     } finally {
       setSubmitting(false);

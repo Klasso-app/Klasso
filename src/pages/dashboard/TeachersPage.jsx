@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
+import { logAction } from "../../lib/auditLog";
 import { IconPlus, IconClipboard, IconCalendar, IconChart } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
@@ -61,12 +62,19 @@ export default function TeachersPage() {
 /* ---------- Fiches ---------- */
 
 function TeacherRecords({ schoolId, teachers, loading }) {
+  const { profile, firebaseUser } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
 
   async function handleDelete(teacher) {
     if (!window.confirm(`Supprimer ${teacher.fullName} de la liste des enseignants ?`)) return;
     await deleteDoc(doc(db, "schools", schoolId, "teachers", teacher.id));
+    logAction(schoolId, {
+      actorUid: firebaseUser?.uid,
+      actorName: profile?.name,
+      action: "Suppression d'un enseignant",
+      details: teacher.fullName,
+    });
   }
 
   function closeForm() {
