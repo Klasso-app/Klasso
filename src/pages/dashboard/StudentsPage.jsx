@@ -220,8 +220,8 @@ export default function StudentsPage() {
 }
 
 function ParentCodeCell({ schoolId, student }) {
-  const [code, setCode] = useState(null);
   const [generating, setGenerating] = useState(false);
+  const existingCode = student.parentInviteCode;
 
   async function handleGenerate() {
     setGenerating(true);
@@ -231,14 +231,16 @@ function ParentCodeCell({ schoolId, student }) {
         studentId: student.id,
         studentName: student.fullName,
       });
-      setCode(newCode);
+      await updateDoc(doc(db, "schools", schoolId, "students", student.id), {
+        parentInviteCode: newCode,
+      });
     } finally {
       setGenerating(false);
     }
   }
 
-  if (code) {
-    return <span className="font-mono text-indigo-600 font-medium">{code}</span>;
+  if (existingCode) {
+    return <span className="font-mono text-indigo-600 font-medium">{existingCode}</span>;
   }
 
   return (

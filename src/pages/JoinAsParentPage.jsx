@@ -29,19 +29,25 @@ export default function JoinAsParentPage() {
     setSubmitting(true);
     let cred;
     try {
+      // Le compte doit être créé AVANT de lire l'invitation : nos règles
+      // Firestore exigent d'être connecté pour lire un code (afin d'éviter
+      // qu'un visiteur non identifié puisse essayer des codes au hasard).
+      cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
+
       const invitation = await getInvitation(form.code);
+
       if (!invitation) {
         setError("Ce code d'invitation est introuvable. Vérifiez-le auprès de l'école.");
+        await cred.user.delete();
         setSubmitting(false);
         return;
       }
       if (invitation.used) {
         setError("Ce code d'invitation a déjà été utilisé.");
+        await cred.user.delete();
         setSubmitting(false);
         return;
       }
-
-      cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
 
       await setDoc(doc(db, "users", cred.user.uid), {
         name: form.name,
