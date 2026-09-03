@@ -13,9 +13,10 @@ import {
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { logAction } from "../../lib/auditLog";
+import { LEVELS, CLASS_NAMES_BY_LEVEL } from "../../lib/schoolLevels";
 import { IconPlus, IconLayers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
-import FormField, { TextInput, Select } from "../../components/auth/FormField";
+import FormField, { Select } from "../../components/auth/FormField";
 
 export default function ClassesPage() {
   const { profile, firebaseUser } = useAuth();
@@ -191,20 +192,36 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
       </h2>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <FormField label="Nom de la classe">
-          <TextInput
+        <FormField label="Niveau">
+          <Select
+            required
+            value={form.level}
+            onChange={(e) => setForm((f) => ({ ...f, level: e.target.value, name: "" }))}
+          >
+            <option value="">Sélectionner un niveau</option>
+            {LEVELS.map((lvl) => <option key={lvl} value={lvl}>{lvl}</option>)}
+            {form.level && !LEVELS.includes(form.level) && (
+              <option value={form.level}>{form.level}</option>
+            )}
+          </Select>
+        </FormField>
+        <FormField label="Classe">
+          <Select
             required
             value={form.name}
             onChange={update("name")}
-            placeholder="Ex : 6ème A, CM2, Grande Section"
-          />
-        </FormField>
-        <FormField label="Niveau">
-          <TextInput
-            value={form.level}
-            onChange={update("level")}
-            placeholder="Ex : Maternelle, CM2, Collège"
-          />
+            disabled={!form.level}
+          >
+            <option value="">
+              {form.level ? "Sélectionner une classe" : "Choisissez d'abord un niveau"}
+            </option>
+            {(CLASS_NAMES_BY_LEVEL[form.level] || []).map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+            {form.name && !(CLASS_NAMES_BY_LEVEL[form.level] || []).includes(form.name) && (
+              <option value={form.name}>{form.name}</option>
+            )}
+          </Select>
         </FormField>
         <FormField label="Enseignant principal">
           <Select value={form.headTeacherId} onChange={update("headTeacherId")}>
