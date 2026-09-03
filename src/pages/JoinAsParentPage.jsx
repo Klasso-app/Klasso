@@ -68,7 +68,7 @@ export default function JoinAsParentPage() {
       setError(
         err.code === "auth/email-already-in-use"
           ? "Cette adresse e-mail est déjà utilisée."
-          : "Une erreur est survenue. Vérifiez le code et réessayez."
+          : `Une erreur est survenue. Vérifiez le code et réessayez. (${err.code || err.message})`
       );
     } finally {
       setSubmitting(false);
