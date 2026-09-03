@@ -3,11 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../lib/firebase";
 import { createSchoolAndDirector } from "../lib/schools";
+import { useAuth } from "../context/AuthContext";
 import KlassoLogo from "../components/ui/KlassoLogo";
 import FormField, { TextInput } from "../components/auth/FormField";
 
 export default function CreateSchoolPage() {
   const navigate = useNavigate();
+  const { refreshProfile } = useAuth();
   const [form, setForm] = useState({
     schoolName: "",
     directorName: "",
@@ -57,6 +59,7 @@ export default function CreateSchoolPage() {
         directorName: form.directorName,
         email: form.email,
       });
+      await refreshProfile();
       navigate("/app");
     } catch (err) {
       // La création du compte a réussi mais l'enregistrement de l'école a

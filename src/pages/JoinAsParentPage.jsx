@@ -4,11 +4,13 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { getInvitation, markInvitationUsed } from "../lib/invitations";
+import { useAuth } from "../context/AuthContext";
 import KlassoLogo from "../components/ui/KlassoLogo";
 import FormField, { TextInput } from "../components/auth/FormField";
 
 export default function JoinAsParentPage() {
   const navigate = useNavigate();
+  const { refreshProfile } = useAuth();
   const [form, setForm] = useState({ code: "", name: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -59,6 +61,7 @@ export default function JoinAsParentPage() {
       });
 
       await markInvitationUsed(form.code, cred.user.uid);
+      await refreshProfile();
       navigate("/app");
     } catch (err) {
       console.error(err);
