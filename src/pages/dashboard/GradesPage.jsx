@@ -5,6 +5,8 @@ import {
   setDoc,
   getDoc,
   onSnapshot,
+  query,
+  orderBy,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
@@ -23,6 +25,7 @@ export default function GradesPage() {
 
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [classId, setClassId] = useState("");
@@ -42,9 +45,14 @@ export default function GradesPage() {
       setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
+    const unsubSubjects = onSnapshot(
+      query(collection(db, "schools", schoolId, "subjects"), orderBy("name", "asc")),
+      (snap) => setSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
     return () => {
       unsubClasses();
       unsubStudents();
+      unsubSubjects();
     };
   }, [schoolId]);
 
@@ -128,11 +136,20 @@ export default function GradesPage() {
             </Select>
           </FormField>
           <FormField label="Matière">
-            <TextInput
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Ex : Mathématiques"
-            />
+            {subjects.length > 0 ? (
+              <Select value={subject} onChange={(e) => setSubject(e.target.value)}>
+                <option value="">Choisir une matière</option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </Select>
+            ) : (
+              <TextInput
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Ex : Mathématiques"
+              />
+            )}
           </FormField>
           <FormField label="Trimestre">
             <Select value={term} onChange={(e) => setTerm(e.target.value)}>
@@ -149,6 +166,12 @@ export default function GradesPage() {
             />
           </FormField>
         </div>
+        {subjects.length === 0 && (
+          <p className="text-xs text-ink-soft mt-3">
+            Astuce : créez vos matières dans le module « Matières » pour pouvoir les
+            sélectionner directement ici.
+          </p>
+        )}
       </div>
 
       {classId && subject && (
