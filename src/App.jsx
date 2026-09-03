@@ -14,6 +14,7 @@ import RoleHomePage from "./pages/RoleHomePage";
 import StudentsPage from "./pages/dashboard/StudentsPage";
 import TeachersPage from "./pages/dashboard/TeachersPage";
 import ClassesPage from "./pages/dashboard/ClassesPage";
+import SubjectsPage from "./pages/dashboard/SubjectsPage";
 import GradesPage from "./pages/dashboard/GradesPage";
 import FinancesPage from "./pages/dashboard/FinancesPage";
 import SchedulePage from "./pages/dashboard/SchedulePage";
@@ -61,6 +62,7 @@ export default function App() {
             <Route path="eleves" element={<Page title="Élèves"><StudentsPage /></Page>} />
             <Route path="enseignants" element={<Page title="Enseignants"><TeachersPage /></Page>} />
             <Route path="classes" element={<Page title="Classes"><ClassesPage /></Page>} />
+            <Route path="matieres" element={<Page title="Matières"><SubjectsPage /></Page>} />
             <Route path="notes" element={<Page title="Notes"><GradesPage /></Page>} />
             <Route path="finances" element={<Page title="Finances"><FinancesPage /></Page>} />
             <Route path="emploi-du-temps" element={<Page title="Emploi du temps"><SchedulePage /></Page>} />

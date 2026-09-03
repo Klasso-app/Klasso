@@ -20,6 +20,7 @@ export const navByRole = {
       { to: "/app/eleves", label: "Élèves", icon: IconUsers },
       { to: "/app/enseignants", label: "Enseignants", icon: IconClipboard },
       { to: "/app/classes", label: "Classes", icon: IconLayers },
+      { to: "/app/matieres", label: "Matières", icon: IconChart },
       { to: "/app/notes", label: "Notes", icon: IconChart },
       { to: "/app/absences", label: "Absences", icon: IconCalendar },
       { to: "/app/finances", label: "Finances", icon: IconWallet },
