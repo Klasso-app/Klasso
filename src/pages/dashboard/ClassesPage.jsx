@@ -112,7 +112,7 @@ export default function ClassesPage() {
                 <tr className="text-left text-xs text-ink-soft">
                   <th className="px-6 py-3 font-medium">Classe</th>
                   <th className="px-6 py-3 font-medium">Niveau</th>
-                  <th className="px-6 py-3 font-medium">Enseignant principal</th>
+                  <th className="px-6 py-3 font-medium">Enseignant</th>
                   <th className="px-6 py-3 font-medium">Effectif</th>
                   <th className="px-6 py-3 font-medium"></th>
                 </tr>
@@ -223,13 +223,24 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
             )}
           </Select>
         </FormField>
-        <FormField label="Enseignant principal">
-          <Select value={form.headTeacherId} onChange={update("headTeacherId")}>
-            <option value="">Aucun pour le moment</option>
+        <FormField label={form.level === "Secondaire" ? "Enseignant principal" : "Enseignant"}>
+          <Select
+            required={form.level !== "Secondaire" && form.level !== ""}
+            value={form.headTeacherId}
+            onChange={update("headTeacherId")}
+          >
+            <option value="">
+              {form.level === "Secondaire" ? "Aucun pour le moment" : "Sélectionner un enseignant"}
+            </option>
             {teachers.map((t) => (
               <option key={t.id} value={t.id}>{t.fullName}</option>
             ))}
           </Select>
+          {form.level && form.level !== "Secondaire" && (
+            <p className="text-xs text-ink-soft mt-1">
+              En maternelle et primaire, un seul enseignant a la charge de toute la classe.
+            </p>
+          )}
         </FormField>
       </div>
 
