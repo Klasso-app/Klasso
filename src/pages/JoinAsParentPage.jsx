@@ -21,8 +21,8 @@ export default function JoinAsParentPage() {
     e.preventDefault();
     setError("");
 
-    if (form.password.length < 6) {
-      setError("Le mot de passe doit contenir au moins 6 caractères.");
+    if (form.password.length < 8) {
+      setError("Le mot de passe doit contenir au moins 8 caractères.");
       return;
     }
 
@@ -68,6 +68,8 @@ export default function JoinAsParentPage() {
       setError(
         err.code === "auth/email-already-in-use"
           ? "Cette adresse e-mail est déjà utilisée."
+          : err.code === "auth/password-does-not-meet-requirements"
+          ? "Le mot de passe ne respecte pas les exigences de sécurité : au moins 8 caractères, avec une majuscule, une minuscule et un chiffre."
           : `Une erreur est survenue. Vérifiez le code et réessayez. (${err.code || err.message})`
       );
     } finally {
@@ -113,7 +115,7 @@ export default function JoinAsParentPage() {
                 required
                 value={form.password}
                 onChange={update("password")}
-                placeholder="6 caractères minimum"
+                placeholder="8 caractères min., avec majuscule et chiffre"
               />
             </FormField>
 

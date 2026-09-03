@@ -27,8 +27,8 @@ export default function CreateSchoolPage() {
     e.preventDefault();
     setError("");
 
-    if (form.password.length < 6) {
-      setError("Le mot de passe doit contenir au moins 6 caractères.");
+    if (form.password.length < 8) {
+      setError("Le mot de passe doit contenir au moins 8 caractères.");
       return;
     }
 
@@ -41,7 +41,9 @@ export default function CreateSchoolPage() {
       setError(
         err.code === "auth/email-already-in-use"
           ? "Cette adresse e-mail est déjà utilisée."
-          : "Impossible de créer le compte. Merci de réessayer."
+          : err.code === "auth/password-does-not-meet-requirements"
+          ? "Le mot de passe ne respecte pas les exigences de sécurité : au moins 8 caractères, avec une majuscule, une minuscule et un chiffre."
+          : `Impossible de créer le compte. Merci de réessayer. (${err.code || err.message})`
       );
       return;
     }
@@ -135,7 +137,7 @@ export default function CreateSchoolPage() {
                 required
                 value={form.password}
                 onChange={update("password")}
-                placeholder="6 caractères minimum"
+                placeholder="8 caractères min., avec majuscule et chiffre"
               />
             </FormField>
 
