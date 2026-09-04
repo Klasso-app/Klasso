@@ -62,6 +62,19 @@ export default function GradesPage() {
     [students, selectedClass]
   );
 
+  const [assignedTeacherName, setAssignedTeacherName] = useState(null);
+
+  useEffect(() => {
+    setAssignedTeacherName(null);
+    if (!schoolId || !classId || !subject || selectedClass?.level !== "Secondaire") return;
+    const id = `${classId}__${slugify(subject)}`;
+    getDoc(doc(db, "schools", schoolId, "classSubjectTeachers", id)).then((snap) => {
+      if (snap.exists() && snap.data().teacherName) {
+        setAssignedTeacherName(snap.data().teacherName);
+      }
+    });
+  }, [schoolId, classId, subject, selectedClass]);
+
   const gradeDocId = classId && subject && term
     ? `${classId}__${slugify(subject)}__${slugify(term)}`
     : null;
@@ -179,6 +192,11 @@ export default function GradesPage() {
           <div className="flex items-center justify-between px-6 py-5">
             <h2 className="font-display text-base text-ink">
               {selectedClass?.name} — {subject} — {term}
+              {assignedTeacherName && (
+                <span className="block text-xs font-normal text-ink-soft mt-1">
+                  Enseignant assigné : {assignedTeacherName}
+                </span>
+              )}
             </h2>
             <div className="flex items-center gap-3">
               {saved && <span className="text-sm text-success">Notes enregistrées</span>}

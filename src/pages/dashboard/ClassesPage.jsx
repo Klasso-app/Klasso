@@ -5,6 +5,8 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  setDoc,
+  getDocs,
   onSnapshot,
   query,
   orderBy,
@@ -25,9 +27,11 @@ export default function ClassesPage() {
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [assigningClass, setAssigningClass] = useState(null);
 
   useEffect(() => {
     if (!schoolId) return;
@@ -47,11 +51,16 @@ export default function ClassesPage() {
       collection(db, "schools", schoolId, "students"),
       (snap) => setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubSubjects = onSnapshot(
+      query(collection(db, "schools", schoolId, "subjects"), orderBy("name", "asc")),
+      (snap) => setSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
 
     return () => {
       unsubClasses();
       unsubTeachers();
       unsubStudents();
+      unsubSubjects();
     };
   }, [schoolId]);
 
@@ -98,6 +107,16 @@ export default function ClassesPage() {
         <ClassForm schoolId={schoolId} teachers={teachers} editing={editing} onDone={closeForm} />
       )}
 
+      {assigningClass && (
+        <SubjectAssignments
+          schoolId={schoolId}
+          klass={assigningClass}
+          subjects={subjects}
+          teachers={teachers}
+          onDone={() => setAssigningClass(null)}
+        />
+      )}
+
       <div className="rounded-xl border border-line bg-surface">
         {!loading && classes.length === 0 ? (
           <EmptyState
@@ -125,13 +144,21 @@ export default function ClassesPage() {
                     <td className="px-6 py-3 text-ink-soft">{c.headTeacherName || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{studentCount(c.name)}</td>
                     <td className="px-6 py-3">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <button
                           onClick={() => { setShowForm(false); setEditing(c); }}
                           className="text-xs text-indigo-600"
                         >
                           Modifier
                         </button>
+                        {c.level === "Secondaire" && (
+                          <button
+                            onClick={() => setAssigningClass(c)}
+                            className="text-xs text-indigo-600"
+                          >
+                            Matières
+                          </button>
+                        )}
                         <button onClick={() => handleDelete(c)} className="text-xs text-danger">
                           Supprimer
                         </button>
@@ -241,6 +268,12 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
               En maternelle et primaire, un seul enseignant a la charge de toute la classe.
             </p>
           )}
+          {form.level === "Secondaire" && (
+            <p className="text-xs text-ink-soft mt-1">
+              Au secondaire, chaque matière a son propre enseignant : utilisez le bouton
+              « Matières » sur la classe une fois créée pour les affecter.
+            </p>
+          )}
         </FormField>
       </div>
 
@@ -257,5 +290,125 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
         </button>
       </div>
     </form>
+  );
+}
+
+/* ---------- Affectation matière ↔ enseignant (secondaire) ---------- */
+
+function assignmentId(classId, subjectName) {
+  const slug = subjectName
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  return `${classId}__${slug}`;
+}
+
+function SubjectAssignments({ schoolId, klass, subjects, teachers, onDone }) {
+  const [assignments, setAssignments] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const snap = await getDocs(collection(db, "schools", schoolId, "classSubjectTeachers"));
+      const map = {};
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        if (data.classId === klass.id) map[data.subject] = data.teacherId || "";
+      });
+      if (!cancelled) {
+        setAssignments(map);
+        setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [schoolId, klass.id]);
+
+  function setTeacherFor(subjectName, teacherId) {
+    setAssignments((a) => ({ ...a, [subjectName]: teacherId }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await Promise.all(
+        subjects.map((s) => {
+          const teacherId = assignments[s.name] || "";
+          const teacher = teachers.find((t) => t.id === teacherId);
+          return setDoc(
+            doc(db, "schools", schoolId, "classSubjectTeachers", assignmentId(klass.id, s.name)),
+            {
+              classId: klass.id,
+              className: klass.name,
+              subject: s.name,
+              teacherId: teacherId || null,
+              teacherName: teacher?.fullName || "",
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        })
+      );
+      onDone();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (subjects.length === 0) {
+    return (
+      <div className="rounded-xl border border-line bg-surface">
+        <EmptyState
+          icon={IconLayers}
+          title="Aucune matière créée"
+          text="Créez vos matières dans le module « Matières » avant de pouvoir affecter des enseignants."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-line bg-surface p-6 flex flex-col gap-4">
+      <h2 className="font-display text-base text-ink">Matières et enseignants — {klass.name}</h2>
+
+      {loading ? (
+        <p className="text-sm text-ink-soft">Chargement...</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {subjects.map((s) => (
+            <div key={s.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <span className="text-sm text-ink sm:w-64 shrink-0">{s.name}</span>
+              <Select
+                value={assignments[s.name] || ""}
+                onChange={(e) => setTeacherFor(s.name, e.target.value)}
+              >
+                <option value="">Non assigné</option>
+                {teachers.map((t) => (
+                  <option key={t.id} value={t.id}>{t.fullName}</option>
+                ))}
+              </Select>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 mt-2">
+        <button
+          onClick={handleSave}
+          disabled={saving || loading}
+          className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60"
+        >
+          {saving ? "Enregistrement" : "Enregistrer les affectations"}
+        </button>
+        <button type="button" onClick={onDone} className="text-sm text-ink-soft px-4 py-2.5">
+          Fermer
+        </button>
+      </div>
+    </div>
   );
 }

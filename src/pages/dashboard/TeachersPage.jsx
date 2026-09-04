@@ -20,11 +20,18 @@ import FormField, { TextInput, Select } from "../../components/auth/FormField";
 const TABS = ["Fiches", "Pointage", "Évaluations", "Congés"];
 const CONTRACT_TYPES = ["CDI", "CDD", "Vacataire"];
 
+function formatSubjects(subjects) {
+  if (!subjects) return "—";
+  if (Array.isArray(subjects)) return subjects.length ? subjects.join(", ") : "—";
+  return subjects; // ancien format (texte libre) — conservé tel quel
+}
+
 export default function TeachersPage() {
   const { profile } = useAuth();
   const schoolId = profile?.schoolId;
   const [tab, setTab] = useState(TABS[0]);
   const [teachers, setTeachers] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,7 +41,14 @@ export default function TeachersPage() {
       setTeachers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
-    return unsub;
+    const unsubSubjects = onSnapshot(
+      query(collection(db, "schools", schoolId, "subjects"), orderBy("name", "asc")),
+      (snap) => setSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+    return () => {
+      unsub();
+      unsubSubjects();
+    };
   }, [schoolId]);
 
   return (
@@ -51,7 +65,7 @@ export default function TeachersPage() {
         ))}
       </div>
 
-      {tab === "Fiches" && <TeacherRecords schoolId={schoolId} teachers={teachers} loading={loading} />}
+      {tab === "Fiches" && <TeacherRecords schoolId={schoolId} teachers={teachers} subjects={subjects} loading={loading} />}
       {tab === "Pointage" && <TeacherAttendance schoolId={schoolId} teachers={teachers} />}
       {tab === "Évaluations" && <TeacherEvaluations schoolId={schoolId} teachers={teachers} />}
       {tab === "Congés" && <TeacherLeaves schoolId={schoolId} teachers={teachers} />}
@@ -61,7 +75,7 @@ export default function TeachersPage() {
 
 /* ---------- Fiches ---------- */
 
-function TeacherRecords({ schoolId, teachers, loading }) {
+function TeacherRecords({ schoolId, teachers, subjects, loading }) {
   const { profile, firebaseUser } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -96,7 +110,7 @@ function TeacherRecords({ schoolId, teachers, loading }) {
       </div>
 
       {(showForm || editing) && (
-        <TeacherForm schoolId={schoolId} editing={editing} onDone={closeForm} />
+        <TeacherForm schoolId={schoolId} subjects={subjects} editing={editing} onDone={closeForm} />
       )}
 
       <div className="rounded-xl border border-line bg-surface">
@@ -123,7 +137,7 @@ function TeacherRecords({ schoolId, teachers, loading }) {
                 {teachers.map((t) => (
                   <tr key={t.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{t.fullName}</td>
-                    <td className="px-6 py-3 text-ink-soft">{t.subjects || "—"}</td>
+                    <td className="px-6 py-3 text-ink-soft">{formatSubjects(t.subjects)}</td>
                     <td className="px-6 py-3 text-ink-soft">{t.contractType || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">
                       {t.monthlySalary ? `${new Intl.NumberFormat("fr-FR").format(t.monthlySalary)} FCFA` : "—"}
@@ -150,26 +164,40 @@ function TeacherRecords({ schoolId, teachers, loading }) {
   );
 }
 
-function TeacherForm({ schoolId, editing, onDone }) {
+function TeacherForm({ schoolId, subjects, editing, onDone }) {
+  const existingSubjects = Array.isArray(editing?.subjects)
+    ? editing.subjects
+    : typeof editing?.subjects === "string" && editing.subjects
+    ? editing.subjects.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+
   const [form, setForm] = useState({
     fullName: editing?.fullName || "",
-    subjects: editing?.subjects || "",
     phone: editing?.phone || "",
     email: editing?.email || "",
     contractType: editing?.contractType || CONTRACT_TYPES[0],
     monthlySalary: editing?.monthlySalary ?? "",
   });
+  const [selectedSubjects, setSelectedSubjects] = useState(existingSubjects);
   const [submitting, setSubmitting] = useState(false);
 
   function update(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   }
 
+  function toggleSubject(name) {
+    setSelectedSubjects((s) => (s.includes(name) ? s.filter((x) => x !== name) : [...s, name]));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const payload = { ...form, monthlySalary: form.monthlySalary === "" ? 0 : Number(form.monthlySalary) };
+      const payload = {
+        ...form,
+        subjects: selectedSubjects,
+        monthlySalary: form.monthlySalary === "" ? 0 : Number(form.monthlySalary),
+      };
       if (editing) {
         await updateDoc(doc(db, "schools", schoolId, "teachers", editing.id), payload);
       } else {
@@ -189,9 +217,6 @@ function TeacherForm({ schoolId, editing, onDone }) {
         <FormField label="Nom complet">
           <TextInput required value={form.fullName} onChange={update("fullName")} />
         </FormField>
-        <FormField label="Matière(s) enseignée(s)">
-          <TextInput value={form.subjects} onChange={update("subjects")} placeholder="Ex : Mathématiques, Physique" />
-        </FormField>
         <FormField label="Téléphone">
           <TextInput value={form.phone} onChange={update("phone")} />
         </FormField>
@@ -207,6 +232,33 @@ function TeacherForm({ schoolId, editing, onDone }) {
           <TextInput type="number" min="0" value={form.monthlySalary} onChange={update("monthlySalary")} />
         </FormField>
       </div>
+
+      <FormField label="Matière(s) enseignée(s)">
+        {subjects.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {subjects.map((s) => {
+              const active = selectedSubjects.includes(s.name);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => toggleSubject(s.name)}
+                  className={`text-xs px-3 py-1.5 rounded-md border ${
+                    active ? "bg-indigo-500 text-white border-indigo-500" : "border-line text-ink-soft"
+                  }`}
+                >
+                  {s.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-ink-soft">
+            Aucune matière créée pour l'instant. Rendez-vous dans le module « Matières » pour en ajouter,
+            puis revenez ici pour les associer à cet enseignant.
+          </p>
+        )}
+      </FormField>
 
       <div className="flex items-center gap-3 mt-2">
         <button type="submit" disabled={submitting} className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60">
