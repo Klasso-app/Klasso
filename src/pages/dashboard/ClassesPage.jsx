@@ -294,15 +294,13 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
 }
 
 /* ---------- Affectation matière ↔ enseignant (secondaire) ---------- */
+// L'identifiant du document combine l'ID de la classe et l'ID de la
+// matière (pas son nom) : cela permet aux règles de sécurité Firestore de
+// retrouver l'affectation sans avoir à reproduire une logique de
+// slug côté serveur.
 
-function assignmentId(classId, subjectName) {
-  const slug = subjectName
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-  return `${classId}__${slug}`;
+function assignmentId(classId, subjectId) {
+  return `${classId}__${subjectId}`;
 }
 
 function SubjectAssignments({ schoolId, klass, subjects, teachers, onDone }) {
@@ -341,11 +339,12 @@ function SubjectAssignments({ schoolId, klass, subjects, teachers, onDone }) {
           const teacherId = assignments[s.name] || "";
           const teacher = teachers.find((t) => t.id === teacherId);
           return setDoc(
-            doc(db, "schools", schoolId, "classSubjectTeachers", assignmentId(klass.id, s.name)),
+            doc(db, "schools", schoolId, "classSubjectTeachers", assignmentId(klass.id, s.id)),
             {
               classId: klass.id,
               className: klass.name,
               subject: s.name,
+              subjectId: s.id,
               teacherId: teacherId || null,
               teacherName: teacher?.fullName || "",
               updatedAt: serverTimestamp(),

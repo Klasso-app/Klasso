@@ -61,19 +61,21 @@ export default function GradesPage() {
     () => students.filter((s) => s.classLabel === selectedClass?.name),
     [students, selectedClass]
   );
+  const selectedSubject = subjects.find((s) => s.name === subject);
+  const subjectId = selectedSubject?.id || null;
 
   const [assignedTeacherName, setAssignedTeacherName] = useState(null);
 
   useEffect(() => {
     setAssignedTeacherName(null);
-    if (!schoolId || !classId || !subject || selectedClass?.level !== "Secondaire") return;
-    const id = `${classId}__${slugify(subject)}`;
+    if (!schoolId || !classId || !subjectId || selectedClass?.level !== "Secondaire") return;
+    const id = `${classId}__${subjectId}`;
     getDoc(doc(db, "schools", schoolId, "classSubjectTeachers", id)).then((snap) => {
       if (snap.exists() && snap.data().teacherName) {
         setAssignedTeacherName(snap.data().teacherName);
       }
     });
-  }, [schoolId, classId, subject, selectedClass]);
+  }, [schoolId, classId, subjectId, selectedClass]);
 
   const gradeDocId = classId && subject && term
     ? `${classId}__${slugify(subject)}__${slugify(term)}`
@@ -110,6 +112,7 @@ export default function GradesPage() {
           classId,
           className: selectedClass?.name || "",
           subject,
+          subjectId,
           term,
           coefficient: Number(coefficient) || 1,
           scores,

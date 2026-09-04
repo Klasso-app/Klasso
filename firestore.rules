@@ -26,6 +26,46 @@ service cloud.firestore {
         (myProfile().role == 'directeur' || myProfile().canEditSchoolSettings == true);
     }
 
+    function isStaff() {
+      return myProfile().role == 'directeur' || myProfile().role == 'secretaire';
+    }
+
+    // Un enseignant ne peut écrire des notes que pour une classe/matière
+    // qui lui est assignée :
+    //  - en maternelle/primaire, la classe a un seul enseignant
+    //    (classes/{id}.headTeacherId) ;
+    //  - au secondaire, chaque matière d'une classe a son propre
+    //    enseignant (classSubjectTeachers/{classId}__{subjectId}).
+    // Par sécurité et pour ne jamais bloquer un usage existant, l'écriture
+    // reste autorisée quand la classe ou l'affectation n'existe pas ou
+    // n'a pas encore été configurée (aucun enseignant assigné).
+    function classData(schoolId, classId) {
+      return get(/databases/$(database)/documents/schools/$(schoolId)/classes/$(classId)).data;
+    }
+
+    function assignmentData(schoolId, classId, subjectId) {
+      return get(/databases/$(database)/documents/schools/$(schoolId)/classSubjectTeachers/$(classId + '__' + subjectId)).data;
+    }
+
+    function isAssignedTeacherForGrade(schoolId, data) {
+      return !exists(/databases/$(database)/documents/schools/$(schoolId)/classes/$(data.classId)) ||
+        (
+          classData(schoolId, data.classId).level != 'Secondaire'
+            ? (classData(schoolId, data.classId).headTeacherId == null ||
+               classData(schoolId, data.classId).headTeacherId == request.auth.uid)
+            : (
+                data.subjectId == null ||
+                !exists(/databases/$(database)/documents/schools/$(schoolId)/classSubjectTeachers/$(data.classId + '__' + data.subjectId)) ||
+                assignmentData(schoolId, data.classId, data.subjectId).teacherId == null ||
+                assignmentData(schoolId, data.classId, data.subjectId).teacherId == request.auth.uid
+              )
+        );
+    }
+
+    function canWriteGrade(schoolId, data) {
+      return isStaff() || (myProfile().role == 'enseignant' && isAssignedTeacherForGrade(schoolId, data));
+    }
+
     // Profil utilisateur : chacun lit/modifie le sien. La création se fait
     // uniquement lors de l'inscription (createSchoolAndDirector côté app),
     // avec un schoolId qui doit correspondre à un établissement existant.
@@ -42,12 +82,17 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update: if canEditSchool(schoolId);
 
-      // Données pédagogiques : accessibles à tout membre de l'établissement.
-      // Le wildcard récursif (au lieu d'un seul niveau) couvre aussi les
-      // sous-collections comme schools/{id}/conversations/{uid}/messages,
-      // utilisées par la messagerie.
+      // Données pédagogiques : accessibles à tout membre de l'établissement,
+      // à l'exception de l'écriture sur "grades" (notes), restreinte à
+      // l'enseignant assigné (ou au personnel de direction/secrétariat).
+      // Le wildcard récursif couvre aussi les sous-collections profondes
+      // comme conversations/{uid}/messages, utilisées par la messagerie.
       match /{document=**} {
-        allow read, write: if belongsToSchool(schoolId);
+        allow read: if belongsToSchool(schoolId);
+        allow create, update: if belongsToSchool(schoolId) &&
+          (document.split('/')[0] != 'grades' || canWriteGrade(schoolId, request.resource.data));
+        allow delete: if belongsToSchool(schoolId) &&
+          (document.split('/')[0] != 'grades' || isStaff());
       }
     }
 
