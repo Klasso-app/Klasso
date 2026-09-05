@@ -28,6 +28,7 @@ export default function FinancesPage() {
   const [payments, setPayments] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [otherFees, setOtherFees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
@@ -48,10 +49,14 @@ export default function FinancesPage() {
     const unsubStudents = onSnapshot(collection(db, "schools", schoolId, "students"), (snap) =>
       setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubOtherFees = onSnapshot(collection(db, "schools", schoolId, "otherFees"), (snap) =>
+      setOtherFees(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
     return () => {
       unsubPayments();
       unsubExpenses();
       unsubStudents();
+      unsubOtherFees();
     };
   }, [schoolId]);
 
@@ -64,15 +69,29 @@ export default function FinancesPage() {
     [expenses]
   );
 
+  // Seuls les paiements de type "Scolarité" (ou sans type, pour les
+  // paiements enregistrés avant l'ajout des autres frais) comptent dans
+  // l'échéancier de scolarité — sinon un paiement de tenue scolaire
+  // fausserait le solde des frais de scolarité.
   const balances = useMemo(() => {
     return students.map((s) => {
       const due = (Number(s.annualFees) || 0) * (1 - (Number(s.discountPercent) || 0) / 100);
       const paid = payments
-        .filter((p) => p.studentId === s.id)
+        .filter((p) => p.studentId === s.id && (!p.feeType || p.feeType === "Scolarité"))
         .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
       return { student: s, due, paid, remaining: Math.max(due - paid, 0) };
     });
   }, [students, payments]);
+
+  const otherFeesTotals = useMemo(() => {
+    return otherFees.map((f) => {
+      const collected = payments
+        .filter((p) => p.feeType === f.name)
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const payers = new Set(payments.filter((p) => p.feeType === f.name).map((p) => p.studentId)).size;
+      return { fee: f, collected, payers };
+    });
+  }, [otherFees, payments]);
 
   const totalDue = balances.reduce((s, b) => s + b.due, 0);
   const totalUnpaid = balances.reduce((s, b) => s + b.remaining, 0);
@@ -159,6 +178,35 @@ export default function FinancesPage() {
         )}
       </div>
 
+      {/* Autres frais — suivi */}
+      {otherFees.length > 0 && (
+        <div className="rounded-xl border border-line bg-surface">
+          <div className="px-6 py-5"><h2 className="font-display text-base text-ink">Autres frais — encaissements</h2></div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-ink-soft border-t border-line">
+                  <th className="px-6 py-3 font-medium">Frais</th>
+                  <th className="px-6 py-3 font-medium">Montant unitaire</th>
+                  <th className="px-6 py-3 font-medium">Élèves ayant payé</th>
+                  <th className="px-6 py-3 font-medium">Total encaissé</th>
+                </tr>
+              </thead>
+              <tbody>
+                {otherFeesTotals.map(({ fee, collected, payers }) => (
+                  <tr key={fee.id} className="border-t border-line">
+                    <td className="px-6 py-3 text-ink">{fee.name}</td>
+                    <td className="px-6 py-3 text-ink-soft">{formatAmount(fee.amount)}</td>
+                    <td className="px-6 py-3 text-ink-soft">{payers}</td>
+                    <td className="px-6 py-3 text-ink">{formatAmount(collected)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Paiements */}
       <div className="flex items-center justify-between">
         <h2 className="font-display text-base text-ink">Paiements enregistrés</h2>
@@ -172,7 +220,7 @@ export default function FinancesPage() {
       </div>
 
       {showPaymentForm && (
-        <NewPaymentForm schoolId={schoolId} students={students} onDone={() => setShowPaymentForm(false)} />
+        <NewPaymentForm schoolId={schoolId} students={students} otherFees={otherFees} onDone={() => setShowPaymentForm(false)} />
       )}
 
       <div className="rounded-xl border border-line bg-surface">
@@ -184,6 +232,7 @@ export default function FinancesPage() {
               <thead>
                 <tr className="text-left text-xs text-ink-soft">
                   <th className="px-6 py-3 font-medium">Élève</th>
+                  <th className="px-6 py-3 font-medium">Type</th>
                   <th className="px-6 py-3 font-medium">Montant</th>
                   <th className="px-6 py-3 font-medium">Moyen</th>
                   <th className="px-6 py-3 font-medium">Date</th>
@@ -194,6 +243,7 @@ export default function FinancesPage() {
                 {payments.map((p) => (
                   <tr key={p.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{p.studentName}</td>
+                    <td className="px-6 py-3 text-ink-soft">{p.feeType || "Scolarité"}</td>
                     <td className="px-6 py-3 text-ink">{formatAmount(Number(p.amount) || 0)}</td>
                     <td className="px-6 py-3 text-ink-soft">{p.method}</td>
                     <td className="px-6 py-3 text-ink-soft">{p.date}</td>
@@ -273,9 +323,10 @@ export default function FinancesPage() {
   );
 }
 
-function NewPaymentForm({ schoolId, students, onDone }) {
+function NewPaymentForm({ schoolId, students, otherFees, onDone }) {
   const [form, setForm] = useState({
     studentId: "",
+    feeType: "Scolarité",
     amount: "",
     method: METHODS[0],
     date: new Date().toISOString().slice(0, 10),
@@ -286,6 +337,16 @@ function NewPaymentForm({ schoolId, students, onDone }) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   }
 
+  function updateFeeType(e) {
+    const feeType = e.target.value;
+    const otherFee = otherFees.find((f) => f.name === feeType);
+    setForm((f) => ({
+      ...f,
+      feeType,
+      amount: otherFee ? otherFee.amount : f.amount,
+    }));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
@@ -294,12 +355,13 @@ function NewPaymentForm({ schoolId, students, onDone }) {
       await addDoc(collection(db, "schools", schoolId, "payments"), {
         studentId: form.studentId,
         studentName: student?.fullName || "Élève",
+        feeType: form.feeType,
         amount: Number(form.amount),
         method: form.method,
         date: form.date,
         createdAt: serverTimestamp(),
       });
-      setForm({ studentId: "", amount: "", method: METHODS[0], date: new Date().toISOString().slice(0, 10) });
+      setForm({ studentId: "", feeType: "Scolarité", amount: "", method: METHODS[0], date: new Date().toISOString().slice(0, 10) });
       onDone();
     } finally {
       setSubmitting(false);
@@ -315,6 +377,12 @@ function NewPaymentForm({ schoolId, students, onDone }) {
           <Select required value={form.studentId} onChange={update("studentId")}>
             <option value="">Sélectionner un élève</option>
             {students.map((s) => <option key={s.id} value={s.id}>{s.fullName}</option>)}
+          </Select>
+        </FormField>
+        <FormField label="Type de frais">
+          <Select value={form.feeType} onChange={updateFeeType}>
+            <option value="Scolarité">Scolarité</option>
+            {otherFees.map((f) => <option key={f.id} value={f.name}>{f.name}</option>)}
           </Select>
         </FormField>
         <FormField label="Montant (FCFA)">
