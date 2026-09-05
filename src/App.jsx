@@ -29,6 +29,7 @@ import LibraryPage from "./pages/dashboard/LibraryPage";
 import TransportPage from "./pages/dashboard/TransportPage";
 import CanteenPage from "./pages/dashboard/CanteenPage";
 import LogsPage from "./pages/dashboard/LogsPage";
+import AdminPage from "./pages/dashboard/AdminPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import ParentHomePage from "./pages/dashboard/ParentHomePage";
 
@@ -77,6 +78,7 @@ export default function App() {
             <Route path="transport" element={<Page title="Transport"><TransportPage /></Page>} />
             <Route path="cantine" element={<Page title="Cantine"><CanteenPage /></Page>} />
             <Route path="historique" element={<Page title="Historique"><LogsPage /></Page>} />
+            <Route path="administration" element={<Page title="Administration"><AdminPage /></Page>} />
             <Route path="mes-classes" element={<Page title="Mes classes"><ClassesPage /></Page>} />
             <Route path="mes-enfants" element={<Page title="Mes enfants"><ParentHomePage /></Page>} />
             <Route

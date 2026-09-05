@@ -69,10 +69,21 @@ service cloud.firestore {
     // Profil utilisateur : chacun lit/modifie le sien. La création se fait
     // uniquement lors de l'inscription (createSchoolAndDirector côté app),
     // avec un schoolId qui doit correspondre à un établissement existant.
+    // Profil utilisateur : chacun lit/modifie le sien. Un directeur peut en
+    // plus créer, lister et révoquer les profils du personnel administratif
+    // (secrétaire, autre directeur) de son propre établissement — nécessaire
+    // pour la section Administration.
     match /users/{uid} {
-      allow read: if isSignedIn() && request.auth.uid == uid;
-      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow list: if isSignedIn() && myProfile().role == 'directeur' &&
+        resource.data.schoolId == myProfile().schoolId;
+      allow create: if isSignedIn() && (
+        request.auth.uid == uid ||
+        (myProfile().role == 'directeur' && request.resource.data.schoolId == myProfile().schoolId)
+      );
       allow update: if isSignedIn() && request.auth.uid == uid;
+      allow delete: if isSignedIn() && myProfile().role == 'directeur' &&
+        resource.data.schoolId == myProfile().schoolId;
     }
 
     // Établissement : lisible par ses membres, modifiable par le directeur

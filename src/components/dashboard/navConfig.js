@@ -35,6 +35,7 @@ export const navByRole = {
     ]},
     { section: "Autres", items: [
       { to: "/app/historique", label: "Historique", icon: IconShield },
+      { to: "/app/administration", label: "Administration", icon: IconUsers },
       { to: "/app/parametres", label: "Paramètres de l'école", icon: IconSettings },
     ]},
   ],
