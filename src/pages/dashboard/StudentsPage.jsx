@@ -29,6 +29,7 @@ export default function StudentsPage() {
 
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [tuitionFees, setTuitionFees] = useState({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -49,9 +50,18 @@ export default function StudentsPage() {
       collection(db, "schools", schoolId, "classes"),
       (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubFees = onSnapshot(
+      collection(db, "schools", schoolId, "tuitionFees"),
+      (snap) => {
+        const map = {};
+        snap.docs.forEach((d) => { map[d.id] = d.data().amount; });
+        setTuitionFees(map);
+      }
+    );
     return () => {
       unsub();
       unsubClasses();
+      unsubFees();
     };
   }, [schoolId]);
 
@@ -133,13 +143,14 @@ export default function StudentsPage() {
       </div>
 
       {(showForm || editing) && (
-        <StudentForm schoolId={schoolId} classes={classes} editing={editing} onDone={closeForm} />
+        <StudentForm schoolId={schoolId} classes={classes} tuitionFees={tuitionFees} editing={editing} onDone={closeForm} />
       )}
 
       {reenrolling && (
         <ReenrollForm
           schoolId={schoolId}
           classes={classes}
+          tuitionFees={tuitionFees}
           student={reenrolling}
           onDone={() => setReenrolling(null)}
         />
@@ -254,20 +265,23 @@ function ParentCodeCell({ schoolId, student }) {
   );
 }
 
-function ReenrollForm({ schoolId, classes, student, onDone }) {
+function ReenrollForm({ schoolId, classes, tuitionFees, student, onDone }) {
   const [classLabel, setClassLabel] = useState(student.classLabel || "");
   const [submitting, setSubmitting] = useState(false);
   const targetYear = nextSchoolYear();
+  const suggestedFee = tuitionFees[classLabel];
 
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await updateDoc(doc(db, "schools", schoolId, "students", student.id), {
+      const payload = {
         classLabel,
         schoolYear: targetYear,
         status: "Actif",
-      });
+      };
+      if (suggestedFee !== undefined) payload.annualFees = suggestedFee;
+      await updateDoc(doc(db, "schools", schoolId, "students", student.id), payload);
       onDone();
     } finally {
       setSubmitting(false);
@@ -288,6 +302,11 @@ function ReenrollForm({ schoolId, classes, student, onDone }) {
         ) : (
           <TextInput required value={classLabel} onChange={(e) => setClassLabel(e.target.value)} />
         )}
+        {classLabel && suggestedFee !== undefined && (
+          <p className="text-xs text-ink-soft mt-1">
+            Frais de scolarité pour cette classe : {new Intl.NumberFormat("fr-FR").format(suggestedFee)} FCFA
+          </p>
+        )}
       </FormField>
       <div className="flex items-center gap-3">
         <button type="submit" disabled={submitting} className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60">
@@ -299,7 +318,7 @@ function ReenrollForm({ schoolId, classes, student, onDone }) {
   );
 }
 
-function StudentForm({ schoolId, classes, editing, onDone }) {
+function StudentForm({ schoolId, classes, tuitionFees, editing, onDone }) {
   const [form, setForm] = useState({
     fullName: editing?.fullName || "",
     classLabel: editing?.classLabel || "",
@@ -313,6 +332,15 @@ function StudentForm({ schoolId, classes, editing, onDone }) {
 
   function update(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  }
+
+  function updateClassLabel(e) {
+    const newClass = e.target.value;
+    setForm((f) => ({
+      ...f,
+      classLabel: newClass,
+      annualFees: tuitionFees[newClass] !== undefined ? tuitionFees[newClass] : f.annualFees,
+    }));
   }
 
   async function handleSubmit(e) {
@@ -357,7 +385,7 @@ function StudentForm({ schoolId, classes, editing, onDone }) {
         </FormField>
         <FormField label="Classe">
           {classes.length > 0 ? (
-            <Select required value={form.classLabel} onChange={update("classLabel")}>
+            <Select required value={form.classLabel} onChange={updateClassLabel}>
               <option value="">Sélectionner une classe</option>
               {classes.map((c) => (
                 <option key={c.id} value={c.name}>{c.name}</option>
@@ -370,6 +398,11 @@ function StudentForm({ schoolId, classes, editing, onDone }) {
               onChange={update("classLabel")}
               placeholder="Ex : CM2, 6ème A"
             />
+          )}
+          {form.classLabel && tuitionFees[form.classLabel] !== undefined && (
+            <p className="text-xs text-ink-soft mt-1">
+              Frais de scolarité pour cette classe : {new Intl.NumberFormat("fr-FR").format(tuitionFees[form.classLabel])} FCFA
+            </p>
           )}
         </FormField>
         <FormField label="Date de naissance">

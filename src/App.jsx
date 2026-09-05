@@ -17,6 +17,7 @@ import ClassesPage from "./pages/dashboard/ClassesPage";
 import SubjectsPage from "./pages/dashboard/SubjectsPage";
 import GradesPage from "./pages/dashboard/GradesPage";
 import FinancesPage from "./pages/dashboard/FinancesPage";
+import TuitionFeesPage from "./pages/dashboard/TuitionFeesPage";
 import SchedulePage from "./pages/dashboard/SchedulePage";
 import InscriptionsPage from "./pages/dashboard/InscriptionsPage";
 import AbsencesPage from "./pages/dashboard/AbsencesPage";
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="matieres" element={<Page title="Matières"><SubjectsPage /></Page>} />
             <Route path="notes" element={<Page title="Notes"><GradesPage /></Page>} />
             <Route path="finances" element={<Page title="Finances"><FinancesPage /></Page>} />
+            <Route path="scolarite" element={<Page title="Scolarité"><TuitionFeesPage /></Page>} />
             <Route path="emploi-du-temps" element={<Page title="Emploi du temps"><SchedulePage /></Page>} />
             <Route path="absences" element={<Page title="Absences"><AbsencesPage /></Page>} />
             <Route path="annonces" element={<Page title="Annonces"><AnnouncementsPage /></Page>} />

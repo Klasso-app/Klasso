@@ -24,6 +24,7 @@ export const navByRole = {
       { to: "/app/notes", label: "Notes", icon: IconChart },
       { to: "/app/absences", label: "Absences", icon: IconCalendar },
       { to: "/app/finances", label: "Finances", icon: IconWallet },
+      { to: "/app/scolarite", label: "Scolarité", icon: IconWallet },
       { to: "/app/statistiques", label: "Statistiques", icon: IconChart },
       { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
       { to: "/app/annonces", label: "Annonces", icon: IconMessage },
