@@ -14,7 +14,16 @@ export default function Sidebar() {
       <div className="px-5 py-5 border-b border-line">
         <KlassoLogo size={30} />
         {school?.name && (
-          <p className="mt-3 text-xs text-ink-soft truncate">{school.name}</p>
+          <div className="mt-3 flex items-center gap-2 min-w-0">
+            {school?.logoUrl && (
+              <img
+                src={school.logoUrl}
+                alt=""
+                className="w-6 h-6 rounded object-contain border border-line shrink-0"
+              />
+            )}
+            <p className="text-xs text-ink-soft truncate">{school.name}</p>
+          </div>
         )}
       </div>
 

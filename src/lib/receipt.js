@@ -1,8 +1,19 @@
+import { fetchImageAsDataUrl } from "./pdfImage";
+
 export async function downloadReceipt({ school, payment }) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a5" });
   const marginX = 18;
   let y = 20;
+
+  const logoDataUrl = await fetchImageAsDataUrl(school?.logoUrl);
+  if (logoDataUrl) {
+    try {
+      doc.addImage(logoDataUrl, "PNG", 112, 10, 18, 18);
+    } catch {
+      // Logo corrompu ou format non supporté : on continue sans lui.
+    }
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);

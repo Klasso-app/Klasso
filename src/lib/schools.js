@@ -20,7 +20,8 @@ import {
   collection,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "./firebase";
 
 export async function createSchoolAndDirector({ uid, schoolName, city, country, directorName, email }) {
   const schoolRef = doc(collection(db, "schools"));
@@ -61,4 +62,13 @@ export async function getSchool(schoolId) {
 
 export async function updateSchool(schoolId, data) {
   await updateDoc(doc(db, "schools", schoolId), data);
+}
+
+export async function uploadSchoolLogo(schoolId, file) {
+  const extension = file.name.split(".").pop();
+  const logoRef = ref(storage, `schools/${schoolId}/logo.${extension}`);
+  await uploadBytes(logoRef, file);
+  const url = await getDownloadURL(logoRef);
+  await updateSchool(schoolId, { logoUrl: url });
+  return url;
 }

@@ -35,7 +35,16 @@ export default function MobileNav({ open, onClose }) {
       </div>
 
       {school?.name && (
-        <p className="px-5 pt-4 text-xs text-ink-soft truncate shrink-0">{school.name}</p>
+        <div className="px-5 pt-4 flex items-center gap-2 shrink-0 min-w-0">
+          {school?.logoUrl && (
+            <img
+              src={school.logoUrl}
+              alt=""
+              className="w-6 h-6 rounded object-contain border border-line shrink-0"
+            />
+          )}
+          <p className="text-xs text-ink-soft truncate">{school.name}</p>
+        </div>
       )}
 
       <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 flex flex-col gap-6">

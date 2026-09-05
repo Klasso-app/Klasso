@@ -1,4 +1,5 @@
 import { averageForStudent, subjectBreakdownForStudent } from "./grades";
+import { fetchImageAsDataUrl } from "./pdfImage";
 
 // jsPDF est chargé à la demande (et non au démarrage de l'app) pour ne pas
 // alourdir le chargement initial du dashboard, alors que peu de visites
@@ -8,6 +9,15 @@ export async function downloadBulletin({ school, student, grades, term, rank, to
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const marginX = 20;
   let y = 22;
+
+  const logoDataUrl = await fetchImageAsDataUrl(school?.logoUrl);
+  if (logoDataUrl) {
+    try {
+      doc.addImage(logoDataUrl, "PNG", 165, 12, 22, 22);
+    } catch {
+      // Logo corrompu ou format non supporté : on continue sans lui.
+    }
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);

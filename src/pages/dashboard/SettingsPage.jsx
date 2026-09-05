@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { updateSchool } from "../../lib/schools";
+import { updateSchool, uploadSchoolLogo } from "../../lib/schools";
 import { logAction } from "../../lib/auditLog";
-import { IconShield } from "../../components/icons";
+import { IconShield, IconFile } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput } from "../../components/auth/FormField";
 
@@ -20,6 +20,8 @@ export default function SettingsPage() {
   });
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState("");
 
   if (!canEdit) {
     return (
@@ -35,6 +37,32 @@ export default function SettingsPage() {
 
   function update(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  }
+
+  async function handleLogoChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setLogoError("Merci de choisir un fichier image (PNG ou JPG).");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoError("L'image ne doit pas dépasser 2 Mo.");
+      return;
+    }
+
+    setLogoError("");
+    setUploadingLogo(true);
+    try {
+      await uploadSchoolLogo(school.id, file);
+      await refreshSchool();
+    } catch (err) {
+      console.error(err);
+      setLogoError("Le téléversement a échoué. Vérifiez votre connexion et réessayez.");
+    } finally {
+      setUploadingLogo(false);
+    }
   }
 
   async function handleSubmit(e) {
@@ -57,7 +85,42 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-xl">
+    <div className="max-w-xl flex flex-col gap-6">
+      <div className="rounded-xl border border-line bg-surface p-6 flex flex-col gap-4">
+        <div>
+          <h2 className="font-display text-base text-ink">Logo de l'établissement</h2>
+          <p className="text-sm text-ink-soft mt-1">
+            Ce logo apparaît sur les bulletins, les reçus de paiement, et dans la barre latérale
+            de l'application. Format PNG ou JPG, 2 Mo maximum.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-lg border border-line bg-surface-tint flex items-center justify-center overflow-hidden shrink-0">
+            {school?.logoUrl ? (
+              <img src={school.logoUrl} alt="Logo de l'établissement" className="w-full h-full object-contain" />
+            ) : (
+              <IconFile className="w-6 h-6 text-ink-soft" />
+            )}
+          </div>
+
+          <label className="text-sm text-indigo-600 border border-indigo-200 rounded-lg px-4 py-2 cursor-pointer">
+            {uploadingLogo ? "Envoi en cours..." : school?.logoUrl ? "Changer le logo" : "Ajouter un logo"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              onChange={handleLogoChange}
+              disabled={uploadingLogo}
+              className="hidden"
+            />
+          </label>
+        </div>
+
+        {logoError && (
+          <p className="text-sm text-danger bg-danger-soft rounded-lg px-3 py-2">{logoError}</p>
+        )}
+      </div>
+
       <form onSubmit={handleSubmit} className="rounded-xl border border-line bg-surface p-6 flex flex-col gap-4">
         <h2 className="font-display text-base text-ink">Informations de l'établissement</h2>
         <p className="text-sm text-ink-soft -mt-2">
