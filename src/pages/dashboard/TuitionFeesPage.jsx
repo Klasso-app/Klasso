@@ -157,7 +157,7 @@ function TuitionByClass() {
 
 /* ---------- Autres frais (catalogue) ---------- */
 
-const TIMINGS = ["À l'inscription", "En cours d'année"];
+const TIMINGS = ["À l'inscription", "À la rentrée", "En cours d'année"];
 
 function OtherFees() {
   const { profile } = useAuth();
