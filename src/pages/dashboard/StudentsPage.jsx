@@ -17,6 +17,7 @@ import { generateMatricule } from "../../lib/students";
 import { exportToCsv } from "../../lib/csv";
 import { currentSchoolYear, nextSchoolYear } from "../../lib/schoolYear";
 import { logAction } from "../../lib/auditLog";
+import { getAccessibleClasses } from "../../lib/scope";
 import { IconPlus, IconUsers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
@@ -65,11 +66,27 @@ export default function StudentsPage() {
     };
   }, [schoolId]);
 
+  // Un directeur ou une secrétaire rattaché à un seul niveau (maternelle,
+  // primaire ou secondaire) ne voit que les classes — et donc les élèves —
+  // de ce niveau.
+  const accessibleClasses = useMemo(
+    () => getAccessibleClasses({ profile, classes, assignments: [] }),
+    [profile, classes]
+  );
+  const accessibleClassNames = useMemo(
+    () => new Set(accessibleClasses.map((c) => c.name)),
+    [accessibleClasses]
+  );
+  const scopedStudents = useMemo(() => {
+    if (!profile?.level) return students;
+    return students.filter((s) => accessibleClassNames.has(s.classLabel));
+  }, [students, profile, accessibleClassNames]);
+
   const visibleStudents = useMemo(() => {
-    if (filter === "Tous") return students;
-    if (filter === "Actifs") return students.filter((s) => (s.status || "Actif") === "Actif");
-    return students.filter((s) => (s.status || "Actif") !== "Actif");
-  }, [students, filter]);
+    if (filter === "Tous") return scopedStudents;
+    if (filter === "Actifs") return scopedStudents.filter((s) => (s.status || "Actif") === "Actif");
+    return scopedStudents.filter((s) => (s.status || "Actif") !== "Actif");
+  }, [scopedStudents, filter]);
 
   async function handleDelete(student) {
     if (!window.confirm(`Supprimer définitivement le dossier de ${student.fullName} ?`)) return;
@@ -143,13 +160,13 @@ export default function StudentsPage() {
       </div>
 
       {(showForm || editing) && (
-        <StudentForm schoolId={schoolId} classes={classes} tuitionFees={tuitionFees} editing={editing} onDone={closeForm} />
+        <StudentForm schoolId={schoolId} classes={accessibleClasses} tuitionFees={tuitionFees} editing={editing} onDone={closeForm} />
       )}
 
       {reenrolling && (
         <ReenrollForm
           schoolId={schoolId}
-          classes={classes}
+          classes={accessibleClasses}
           tuitionFees={tuitionFees}
           student={reenrolling}
           onDone={() => setReenrolling(null)}

@@ -4,6 +4,7 @@ import {
   collection,
   getCountFromServer,
   query,
+  where,
   orderBy,
   limit,
   getDocs,
@@ -11,6 +12,7 @@ import {
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { fetchAllGrades, schoolAverage } from "../../lib/grades";
+import { getAccessibleClasses } from "../../lib/scope";
 import StatCard from "../../components/dashboard/StatCard";
 import EmptyState from "../../components/dashboard/EmptyState";
 import {
@@ -35,43 +37,90 @@ export default function DirecteurHomePage() {
   useEffect(() => {
     if (!schoolId) return;
 
-    async function loadCounts() {
-      const cols = ["students", "teachers", "classes"];
-      const results = await Promise.all(
-        cols.map((c) => getCountFromServer(collection(db, "schools", schoolId, c)))
+    // Un directeur rattaché à un seul niveau (maternelle, primaire ou
+    // secondaire) ne voit que les chiffres de ce niveau.
+    async function getScopedClassNames() {
+      if (!profile?.level) return null; // null = pas de restriction
+      const snap = await getDocs(collection(db, "schools", schoolId, "classes"));
+      const classes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const accessible = getAccessibleClasses({ profile, classes, assignments: [] });
+      return accessible.map((c) => c.name);
+    }
+
+    async function loadCounts(classNames) {
+      const teachersCount = await getCountFromServer(collection(db, "schools", schoolId, "teachers"));
+
+      if (classNames === null) {
+        const [studentsCount, classesCount] = await Promise.all([
+          getCountFromServer(collection(db, "schools", schoolId, "students")),
+          getCountFromServer(collection(db, "schools", schoolId, "classes")),
+        ]);
+        setCounts({
+          students: studentsCount.data().count,
+          teachers: teachersCount.data().count,
+          classes: classesCount.data().count,
+        });
+        return;
+      }
+
+      if (classNames.length === 0) {
+        setCounts({ students: 0, teachers: teachersCount.data().count, classes: 0 });
+        return;
+      }
+
+      const studentsSnap = await getDocs(
+        query(collection(db, "schools", schoolId, "students"), where("classLabel", "in", classNames))
       );
       setCounts({
-        students: results[0].data().count,
-        teachers: results[1].data().count,
-        classes: results[2].data().count,
+        students: studentsSnap.size,
+        teachers: teachersCount.data().count,
+        classes: classNames.length,
       });
     }
 
-    async function loadAverage() {
-      const [grades, studentsSnap] = await Promise.all([
-        fetchAllGrades(schoolId),
-        getDocs(collection(db, "schools", schoolId, "students")),
-      ]);
+    async function loadAverage(classNames) {
+      let studentsSnap;
+      if (classNames === null) {
+        studentsSnap = await getDocs(collection(db, "schools", schoolId, "students"));
+      } else if (classNames.length === 0) {
+        setAvgGrade(null);
+        return;
+      } else {
+        studentsSnap = await getDocs(
+          query(collection(db, "schools", schoolId, "students"), where("classLabel", "in", classNames))
+        );
+      }
+      const grades = await fetchAllGrades(schoolId);
       const studentIds = studentsSnap.docs.map((d) => d.id);
       setAvgGrade(schoolAverage(grades, studentIds));
     }
 
-    async function loadRecentStudents() {
+    async function loadRecentStudents(classNames) {
       setLoadingList(true);
-      const q = query(
-        collection(db, "schools", schoolId, "students"),
-        orderBy("createdAt", "desc"),
-        limit(6)
-      );
+      if (classNames !== null && classNames.length === 0) {
+        setRecentStudents([]);
+        setLoadingList(false);
+        return;
+      }
+      const q = classNames === null
+        ? query(collection(db, "schools", schoolId, "students"), orderBy("createdAt", "desc"), limit(6))
+        : query(
+            collection(db, "schools", schoolId, "students"),
+            where("classLabel", "in", classNames),
+            orderBy("createdAt", "desc"),
+            limit(6)
+          );
       const snap = await getDocs(q);
       setRecentStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoadingList(false);
     }
 
-    loadCounts().catch(() => setCounts({ students: 0, teachers: 0, classes: 0 }));
-    loadAverage().catch(() => setAvgGrade(null));
-    loadRecentStudents().catch(() => setLoadingList(false));
-  }, [schoolId]);
+    getScopedClassNames().then((classNames) => {
+      loadCounts(classNames).catch(() => setCounts({ students: 0, teachers: 0, classes: 0 }));
+      loadAverage(classNames).catch(() => setAvgGrade(null));
+      loadRecentStudents(classNames).catch(() => setLoadingList(false));
+    });
+  }, [schoolId, profile?.level]);
 
   return (
     <div className="flex flex-col gap-6">

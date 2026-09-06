@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { createStaffAccount, fetchSchoolStaff, revokeStaffAccess } from "../../lib/staffAccounts";
+import { LEVELS } from "../../lib/schoolLevels";
 import { IconPlus, IconShield, IconUserCircle } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
@@ -99,6 +100,7 @@ export default function AdminPage() {
                   <th className="px-6 py-3 font-medium">Nom</th>
                   <th className="px-6 py-3 font-medium">E-mail</th>
                   <th className="px-6 py-3 font-medium">Rôle</th>
+                  <th className="px-6 py-3 font-medium">Niveau</th>
                   <th className="px-6 py-3 font-medium"></th>
                 </tr>
               </thead>
@@ -113,6 +115,7 @@ export default function AdminPage() {
                     </td>
                     <td className="px-6 py-3 text-ink-soft">{m.email}</td>
                     <td className="px-6 py-3 text-ink-soft">{roleLabel(m.role)}</td>
+                    <td className="px-6 py-3 text-ink-soft">{m.level || "Tous les niveaux"}</td>
                     <td className="px-6 py-3">
                       {m.id !== firebaseUser?.uid && (
                         <button onClick={() => handleRevoke(m)} className="text-xs text-danger">
@@ -132,9 +135,8 @@ export default function AdminPage() {
 }
 
 function NewStaffForm({ schoolId, onDone }) {
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "secretaire" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "secretaire", level: "" });
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   function update(field) {
@@ -144,7 +146,6 @@ function NewStaffForm({ schoolId, onDone }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
-    setSuccess(null);
 
     if (form.password.length < 8) {
       setError("Le mot de passe doit contenir au moins 8 caractères.");
@@ -153,9 +154,9 @@ function NewStaffForm({ schoolId, onDone }) {
 
     setSubmitting(true);
     try {
-      await createStaffAccount({ schoolId, ...form });
-      setSuccess({ email: form.email, password: form.password });
-      setForm({ name: "", email: "", password: "", role: "secretaire" });
+      const { level, ...rest } = form;
+      await createStaffAccount({ schoolId, ...rest, level: level || null });
+      setForm({ name: "", email: "", password: "", role: "secretaire", level: "" });
       onDone();
     } catch (err) {
       console.error(err);
@@ -195,6 +196,16 @@ function NewStaffForm({ schoolId, onDone }) {
             onChange={update("password")}
             placeholder="8 caractères min., avec majuscule et chiffre"
           />
+        </FormField>
+        <FormField label="Niveau d'accès">
+          <Select value={form.level} onChange={update("level")}>
+            <option value="">Tous les niveaux (accès complet)</option>
+            {LEVELS.map((lvl) => <option key={lvl} value={lvl}>{lvl} uniquement</option>)}
+          </Select>
+          <p className="text-xs text-ink-soft mt-1">
+            Si vous choisissez un niveau, cette personne ne verra que les élèves, classes,
+            notes et finances de ce niveau.
+          </p>
         </FormField>
       </div>
 

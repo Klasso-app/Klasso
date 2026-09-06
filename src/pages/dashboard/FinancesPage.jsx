@@ -13,6 +13,7 @@ import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { downloadReceipt } from "../../lib/receipt";
 import { exportToCsv } from "../../lib/csv";
+import { getAccessibleClasses } from "../../lib/scope";
 import { IconPlus, IconWallet, IconFile } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import StatCard from "../../components/dashboard/StatCard";
@@ -28,6 +29,7 @@ export default function FinancesPage() {
   const [payments, setPayments] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [otherFees, setOtherFees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -49,6 +51,9 @@ export default function FinancesPage() {
     const unsubStudents = onSnapshot(collection(db, "schools", schoolId, "students"), (snap) =>
       setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubClasses = onSnapshot(collection(db, "schools", schoolId, "classes"), (snap) =>
+      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
     const unsubOtherFees = onSnapshot(collection(db, "schools", schoolId, "otherFees"), (snap) =>
       setOtherFees(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
@@ -56,13 +61,32 @@ export default function FinancesPage() {
       unsubPayments();
       unsubExpenses();
       unsubStudents();
+      unsubClasses();
       unsubOtherFees();
     };
   }, [schoolId]);
 
+  // Une secrétaire ou un directeur rattaché à un seul niveau ne voit et ne
+  // manipule que les finances des élèves de ce niveau.
+  const accessibleClassNames = useMemo(() => {
+    const accessible = getAccessibleClasses({ profile, classes, assignments: [] });
+    return new Set(accessible.map((c) => c.name));
+  }, [profile, classes]);
+
+  const scopedStudents = useMemo(() => {
+    if (!profile?.level) return students;
+    return students.filter((s) => accessibleClassNames.has(s.classLabel));
+  }, [students, profile, accessibleClassNames]);
+
+  const scopedStudentIds = useMemo(() => new Set(scopedStudents.map((s) => s.id)), [scopedStudents]);
+  const scopedPayments = useMemo(
+    () => payments.filter((p) => scopedStudentIds.has(p.studentId)),
+    [payments, scopedStudentIds]
+  );
+
   const totalIncome = useMemo(
-    () => payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
-    [payments]
+    () => scopedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
+    [scopedPayments]
   );
   const totalExpenses = useMemo(
     () => expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
@@ -74,21 +98,21 @@ export default function FinancesPage() {
   // l'échéancier de scolarité — sinon un paiement de tenue scolaire
   // fausserait le solde des frais de scolarité.
   const balances = useMemo(() => {
-    return students.map((s) => {
+    return scopedStudents.map((s) => {
       const due = (Number(s.annualFees) || 0) * (1 - (Number(s.discountPercent) || 0) / 100);
       const paid = payments
         .filter((p) => p.studentId === s.id && (!p.feeType || p.feeType === "Scolarité"))
         .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
       return { student: s, due, paid, remaining: Math.max(due - paid, 0) };
     });
-  }, [students, payments]);
+  }, [scopedStudents, payments]);
 
   const otherFeesTotals = useMemo(() => {
     return otherFees.map((f) => {
-      const collected = payments
+      const collected = scopedPayments
         .filter((p) => p.feeType === f.name)
         .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-      const payers = new Set(payments.filter((p) => p.feeType === f.name).map((p) => p.studentId)).size;
+      const payers = new Set(scopedPayments.filter((p) => p.feeType === f.name).map((p) => p.studentId)).size;
       return { fee: f, collected, payers };
     });
   }, [otherFees, payments]);
@@ -220,11 +244,11 @@ export default function FinancesPage() {
       </div>
 
       {showPaymentForm && (
-        <NewPaymentForm schoolId={schoolId} students={students} otherFees={otherFees} onDone={() => setShowPaymentForm(false)} />
+        <NewPaymentForm schoolId={schoolId} students={scopedStudents} otherFees={otherFees} onDone={() => setShowPaymentForm(false)} />
       )}
 
       <div className="rounded-xl border border-line bg-surface">
-        {!loading && payments.length === 0 ? (
+        {!loading && scopedPayments.length === 0 ? (
           <EmptyState icon={IconWallet} title="Aucun paiement enregistré" text="Enregistrez les frais de scolarité au fur et à mesure des paiements." />
         ) : (
           <div className="overflow-x-auto">
@@ -240,7 +264,7 @@ export default function FinancesPage() {
                 </tr>
               </thead>
               <tbody>
-                {payments.map((p) => (
+                {scopedPayments.map((p) => (
                   <tr key={p.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{p.studentName}</td>
                     <td className="px-6 py-3 text-ink-soft">{p.feeType || "Scolarité"}</td>

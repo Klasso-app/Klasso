@@ -24,7 +24,7 @@ import { db, firebaseConfig } from "./firebase";
 
 const ADMIN_ROLES = ["directeur", "secretaire"];
 
-export async function createStaffAccount({ schoolId, name, email, password, role }) {
+export async function createStaffAccount({ schoolId, name, email, password, role, level }) {
   const secondaryApp = initializeApp(firebaseConfig, `staff-creation-${Date.now()}`);
   const secondaryAuth = getAuth(secondaryApp);
 
@@ -35,6 +35,7 @@ export async function createStaffAccount({ schoolId, name, email, password, role
       name,
       email,
       role,
+      level: level || null,
       schoolId,
       canEditSchoolSettings: role === "directeur",
       createdAt: serverTimestamp(),

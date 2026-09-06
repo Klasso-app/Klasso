@@ -16,6 +16,7 @@ import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { logAction } from "../../lib/auditLog";
 import { LEVELS, CLASS_NAMES_BY_LEVEL } from "../../lib/schoolLevels";
+import { getAccessibleClasses } from "../../lib/scope";
 import { IconPlus, IconLayers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { Select } from "../../components/auth/FormField";
@@ -23,11 +24,13 @@ import FormField, { Select } from "../../components/auth/FormField";
 export default function ClassesPage() {
   const { profile, firebaseUser } = useAuth();
   const schoolId = profile?.schoolId;
+  const isTeacher = profile?.role === "enseignant";
 
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -55,14 +58,21 @@ export default function ClassesPage() {
       query(collection(db, "schools", schoolId, "subjects"), orderBy("name", "asc")),
       (snap) => setSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubAssignments = onSnapshot(
+      collection(db, "schools", schoolId, "classSubjectTeachers"),
+      (snap) => setAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
 
     return () => {
       unsubClasses();
       unsubTeachers();
       unsubStudents();
       unsubSubjects();
+      unsubAssignments();
     };
   }, [schoolId]);
+
+  const visibleClasses = getAccessibleClasses({ profile, classes, assignments });
 
   function studentCount(className) {
     return students.filter((s) => s.classLabel === className).length;
@@ -92,22 +102,24 @@ export default function ClassesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <p className="text-sm text-ink-soft">
-          {classes.length} classe{classes.length > 1 ? "s" : ""}
+          {visibleClasses.length} classe{visibleClasses.length > 1 ? "s" : ""}
         </p>
-        <button
-          onClick={() => { setEditing(null); setShowForm((v) => !v); }}
-          className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
-        >
-          <IconPlus className="w-4 h-4" />
-          Nouvelle classe
-        </button>
+        {!isTeacher && (
+          <button
+            onClick={() => { setEditing(null); setShowForm((v) => !v); }}
+            className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
+          >
+            <IconPlus className="w-4 h-4" />
+            Nouvelle classe
+          </button>
+        )}
       </div>
 
-      {(showForm || editing) && (
+      {!isTeacher && (showForm || editing) && (
         <ClassForm schoolId={schoolId} teachers={teachers} editing={editing} onDone={closeForm} />
       )}
 
-      {assigningClass && (
+      {!isTeacher && assigningClass && (
         <SubjectAssignments
           schoolId={schoolId}
           klass={assigningClass}
@@ -118,11 +130,15 @@ export default function ClassesPage() {
       )}
 
       <div className="rounded-xl border border-line bg-surface">
-        {!loading && classes.length === 0 ? (
+        {!loading && visibleClasses.length === 0 ? (
           <EmptyState
             icon={IconLayers}
-            title="Aucune classe créée"
-            text="Créez vos classes (ex : CP, CM2, 6ème A) pour pouvoir y inscrire des élèves et affecter des enseignants."
+            title={isTeacher ? "Aucune classe ne vous est encore attribuée" : "Aucune classe créée"}
+            text={
+              isTeacher
+                ? "Contactez la direction pour être affecté à une classe."
+                : "Créez vos classes (ex : CP, CM2, 6ème A) pour pouvoir y inscrire des élèves et affecter des enseignants."
+            }
           />
         ) : (
           <div className="overflow-x-auto">
@@ -133,37 +149,39 @@ export default function ClassesPage() {
                   <th className="px-6 py-3 font-medium">Niveau</th>
                   <th className="px-6 py-3 font-medium">Enseignant</th>
                   <th className="px-6 py-3 font-medium">Effectif</th>
-                  <th className="px-6 py-3 font-medium"></th>
+                  {!isTeacher && <th className="px-6 py-3 font-medium"></th>}
                 </tr>
               </thead>
               <tbody>
-                {classes.map((c) => (
+                {visibleClasses.map((c) => (
                   <tr key={c.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{c.name}</td>
                     <td className="px-6 py-3 text-ink-soft">{c.level || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{c.headTeacherName || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{studentCount(c.name)}</td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <button
-                          onClick={() => { setShowForm(false); setEditing(c); }}
-                          className="text-xs text-indigo-600"
-                        >
-                          Modifier
-                        </button>
-                        {c.level === "Secondaire" && (
+                    {!isTeacher && (
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <button
-                            onClick={() => setAssigningClass(c)}
+                            onClick={() => { setShowForm(false); setEditing(c); }}
                             className="text-xs text-indigo-600"
                           >
-                            Matières
+                            Modifier
                           </button>
-                        )}
-                        <button onClick={() => handleDelete(c)} className="text-xs text-danger">
-                          Supprimer
-                        </button>
-                      </div>
-                    </td>
+                          {c.level === "Secondaire" && (
+                            <button
+                              onClick={() => setAssigningClass(c)}
+                              className="text-xs text-indigo-600"
+                            >
+                              Matières
+                            </button>
+                          )}
+                          <button onClick={() => handleDelete(c)} className="text-xs text-danger">
+                            Supprimer
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

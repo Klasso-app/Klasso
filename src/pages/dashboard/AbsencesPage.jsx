@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
+import { getAccessibleClasses } from "../../lib/scope";
 import { IconCalendar, IconUsers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { Select, TextInput } from "../../components/auth/FormField";
@@ -22,6 +23,7 @@ export default function AbsencesPage() {
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
   const [absences, setAbsences] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [classId, setClassId] = useState("");
@@ -44,12 +46,22 @@ export default function AbsencesPage() {
         setLoading(false);
       }
     );
+    const unsubAssignments = onSnapshot(
+      collection(db, "schools", schoolId, "classSubjectTeachers"),
+      (snap) => setAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
     return () => {
       unsubClasses();
       unsubStudents();
       unsubAbsences();
+      unsubAssignments();
     };
   }, [schoolId]);
+
+  const accessibleClasses = useMemo(
+    () => getAccessibleClasses({ profile, classes, assignments }),
+    [profile, classes, assignments]
+  );
 
   const selectedClass = classes.find((c) => c.id === classId);
   const classStudents = useMemo(
@@ -89,13 +101,17 @@ export default function AbsencesPage() {
     await deleteDoc(doc(db, "schools", schoolId, "absences", absence.id));
   }
 
-  if (!loading && classes.length === 0) {
+  if (!loading && accessibleClasses.length === 0) {
     return (
       <div className="rounded-xl border border-line bg-surface">
         <EmptyState
           icon={IconCalendar}
           title="Aucune classe disponible"
-          text="Créez d'abord des classes dans le module « Classes » pour pouvoir y enregistrer des absences."
+          text={
+            profile?.role === "enseignant"
+              ? "Aucune classe ne vous est encore attribuée. Contactez la direction."
+              : "Créez d'abord des classes dans le module « Classes » pour pouvoir y enregistrer des absences."
+          }
         />
       </div>
     );
@@ -109,7 +125,7 @@ export default function AbsencesPage() {
           <FormField label="Classe">
             <Select value={classId} onChange={(e) => setClassId(e.target.value)}>
               <option value="">Choisir une classe</option>
-              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {accessibleClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           </FormField>
           <FormField label="Date">

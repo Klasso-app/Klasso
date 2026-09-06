@@ -4,6 +4,7 @@ import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { averageForStudent } from "../../lib/grades";
 import { exportToCsv } from "../../lib/csv";
+import { getAccessibleClasses } from "../../lib/scope";
 import EmptyState from "../../components/dashboard/EmptyState";
 import { IconChart } from "../../components/icons";
 
@@ -37,8 +38,13 @@ export default function StatsPage() {
     return () => unsubs.forEach((u) => u());
   }, [schoolId]);
 
+  const accessibleClasses = useMemo(
+    () => getAccessibleClasses({ profile, classes, assignments: [] }),
+    [profile, classes]
+  );
+
   const classStats = useMemo(() => {
-    return classes.map((c) => {
+    return accessibleClasses.map((c) => {
       const classStudents = students.filter((s) => s.classLabel === c.name);
       const averages = classStudents
         .map((s) => averageForStudent(grades, s.id))
@@ -49,12 +55,14 @@ export default function StatsPage() {
       const classAbsences = absences.filter((a) => a.classLabel === c.name).length;
       return { name: c.name, effectif: classStudents.length, average: classAverage, absences: classAbsences };
     });
-  }, [classes, students, grades, absences]);
+  }, [accessibleClasses, students, grades, absences]);
 
   const subjectStats = useMemo(() => {
+    const accessibleNames = new Set(accessibleClasses.map((c) => c.name));
     const bySubject = {};
     grades.forEach((g) => {
       if (!g.subject) return;
+      if (g.className && !accessibleNames.has(g.className)) return;
       const scores = Object.values(g.scores || {}).filter((v) => typeof v === "number");
       if (scores.length === 0) return;
       if (!bySubject[g.subject]) bySubject[g.subject] = [];
@@ -65,9 +73,9 @@ export default function StatsPage() {
       average: Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 100) / 100,
       count: scores.length,
     }));
-  }, [grades]);
+  }, [grades, accessibleClasses]);
 
-  if (!loading && classes.length === 0) {
+  if (!loading && accessibleClasses.length === 0) {
     return (
       <div className="rounded-xl border border-line bg-surface">
         <EmptyState
