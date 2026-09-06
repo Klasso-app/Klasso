@@ -13,6 +13,7 @@ import {
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { logAction } from "../../lib/auditLog";
+import { LEVELS } from "../../lib/schoolLevels";
 import { IconPlus, IconClipboard, IconCalendar, IconChart } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
@@ -30,7 +31,7 @@ export default function TeachersPage() {
   const { profile } = useAuth();
   const schoolId = profile?.schoolId;
   const [tab, setTab] = useState(TABS[0]);
-  const [teachers, setTeachers] = useState([]);
+  const [allTeachers, setAllTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +39,7 @@ export default function TeachersPage() {
     if (!schoolId) return;
     const q = query(collection(db, "schools", schoolId, "teachers"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
-      setTeachers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setAllTeachers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
     const unsubSubjects = onSnapshot(
@@ -50,6 +51,14 @@ export default function TeachersPage() {
       unsubSubjects();
     };
   }, [schoolId]);
+
+  // Un directeur ou une secrétaire rattaché à un seul niveau ne voit que
+  // les enseignants de ce niveau. Les enseignants de niveau non renseigné
+  // (créés avant ce champ) restent visibles par tout le monde, pour ne
+  // rien cacher par accident.
+  const teachers = profile?.level
+    ? allTeachers.filter((t) => !t.level || t.level === profile.level)
+    : allTeachers;
 
   return (
     <div className="flex flex-col gap-6">
@@ -126,6 +135,7 @@ function TeacherRecords({ schoolId, teachers, subjects, loading }) {
               <thead>
                 <tr className="text-left text-xs text-ink-soft">
                   <th className="px-6 py-3 font-medium">Nom</th>
+                  <th className="px-6 py-3 font-medium">Niveau</th>
                   <th className="px-6 py-3 font-medium">Matière(s)</th>
                   <th className="px-6 py-3 font-medium">Contrat</th>
                   <th className="px-6 py-3 font-medium">Salaire mensuel</th>
@@ -137,7 +147,8 @@ function TeacherRecords({ schoolId, teachers, subjects, loading }) {
                 {teachers.map((t) => (
                   <tr key={t.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{t.fullName}</td>
-                    <td className="px-6 py-3 text-ink-soft">{formatSubjects(t.subjects)}</td>
+                    <td className="px-6 py-3 text-ink-soft">{t.level || "—"}</td>
+                    <td className="px-6 py-3 text-ink-soft">{t.level === "Secondaire" ? formatSubjects(t.subjects) : "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{t.contractType || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">
                       {t.monthlySalary ? `${new Intl.NumberFormat("fr-FR").format(t.monthlySalary)} FCFA` : "—"}
@@ -173,6 +184,7 @@ function TeacherForm({ schoolId, subjects, editing, onDone }) {
 
   const [form, setForm] = useState({
     fullName: editing?.fullName || "",
+    level: editing?.level || "",
     phone: editing?.phone || "",
     email: editing?.email || "",
     contractType: editing?.contractType || CONTRACT_TYPES[0],
@@ -195,7 +207,7 @@ function TeacherForm({ schoolId, subjects, editing, onDone }) {
     try {
       const payload = {
         ...form,
-        subjects: selectedSubjects,
+        subjects: form.level === "Secondaire" ? selectedSubjects : [],
         monthlySalary: form.monthlySalary === "" ? 0 : Number(form.monthlySalary),
       };
       if (editing) {
@@ -217,6 +229,12 @@ function TeacherForm({ schoolId, subjects, editing, onDone }) {
         <FormField label="Nom complet">
           <TextInput required value={form.fullName} onChange={update("fullName")} />
         </FormField>
+        <FormField label="Niveau">
+          <Select required value={form.level} onChange={update("level")}>
+            <option value="">Sélectionner un niveau</option>
+            {LEVELS.map((lvl) => <option key={lvl} value={lvl}>{lvl}</option>)}
+          </Select>
+        </FormField>
         <FormField label="Téléphone">
           <TextInput value={form.phone} onChange={update("phone")} />
         </FormField>
@@ -233,32 +251,41 @@ function TeacherForm({ schoolId, subjects, editing, onDone }) {
         </FormField>
       </div>
 
-      <FormField label="Matière(s) enseignée(s)">
-        {subjects.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {subjects.map((s) => {
-              const active = selectedSubjects.includes(s.name);
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => toggleSubject(s.name)}
-                  className={`text-xs px-3 py-1.5 rounded-md border ${
-                    active ? "bg-indigo-500 text-white border-indigo-500" : "border-line text-ink-soft"
-                  }`}
-                >
-                  {s.name}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-xs text-ink-soft">
-            Aucune matière créée pour l'instant. Rendez-vous dans le module « Matières » pour en ajouter,
-            puis revenez ici pour les associer à cet enseignant.
-          </p>
-        )}
-      </FormField>
+      {form.level === "Secondaire" && (
+        <FormField label="Matière(s) enseignée(s)">
+          {subjects.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {subjects.map((s) => {
+                const active = selectedSubjects.includes(s.name);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => toggleSubject(s.name)}
+                    className={`text-xs px-3 py-1.5 rounded-md border ${
+                      active ? "bg-indigo-500 text-white border-indigo-500" : "border-line text-ink-soft"
+                    }`}
+                  >
+                    {s.name}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-ink-soft">
+              Aucune matière créée pour l'instant. Rendez-vous dans le module « Matières » pour en ajouter,
+              puis revenez ici pour les associer à cet enseignant.
+            </p>
+          )}
+        </FormField>
+      )}
+
+      {form.level && form.level !== "Secondaire" && (
+        <p className="text-xs text-ink-soft -mt-2">
+          En {form.level.toLowerCase()}, un enseignant a la charge de toutes les matières de sa
+          classe : pas de sélection de matière nécessaire ici.
+        </p>
+      )}
 
       <div className="flex items-center gap-3 mt-2">
         <button type="submit" disabled={submitting} className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60">
