@@ -63,9 +63,10 @@ export async function downloadBulletin({ school, student, grades, term, rank, to
   doc.setFontSize(10);
   doc.setTextColor(70, 70, 70);
   doc.text("Matière", marginX, y);
-  doc.text("Trimestre", 95, y);
-  doc.text("Note / 20", 140, y);
-  doc.text("Coef.", 170, y);
+  doc.text("Type", 72, y);
+  doc.text("Trimestre", 105, y);
+  doc.text("Note / 20", 145, y);
+  doc.text("Coef.", 172, y);
   y += 3;
   doc.setDrawColor(228, 230, 238);
   doc.line(marginX, y, 190, y);
@@ -81,9 +82,10 @@ export async function downloadBulletin({ school, student, grades, term, rank, to
   } else {
     rows.forEach((r) => {
       doc.text(r.subject, marginX, y);
-      doc.text(r.term, 95, y);
-      doc.text(String(r.score), 140, y);
-      doc.text(String(r.coefficient), 170, y);
+      doc.text(r.evaluationType || "—", 72, y);
+      doc.text(r.term, 105, y);
+      doc.text(String(r.score), 145, y);
+      doc.text(String(r.coefficient), 172, y);
       y += 7;
     });
   }

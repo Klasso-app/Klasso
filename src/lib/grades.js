@@ -46,6 +46,7 @@ export function subjectBreakdownForStudent(grades, studentId) {
     .map((g) => ({
       subject: g.subject,
       term: g.term,
+      evaluationType: g.evaluationType || "",
       score: g.scores[studentId],
       coefficient: g.coefficient || 1,
     }))

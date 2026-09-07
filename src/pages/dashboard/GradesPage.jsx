@@ -14,6 +14,7 @@ import { useAuth } from "../../context/AuthContext";
 import { averageForStudent } from "../../lib/grades";
 import { downloadBulletin } from "../../lib/bulletin";
 import { getAccessibleClasses } from "../../lib/scope";
+import { EVALUATION_TYPES_BY_LEVEL } from "../../lib/schoolLevels";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { Select, TextInput } from "../../components/auth/FormField";
 import { IconChart, IconFile } from "../../components/icons";
@@ -32,6 +33,7 @@ export default function GradesPage() {
 
   const [classId, setClassId] = useState("");
   const [subject, setSubject] = useState("");
+  const [evaluationType, setEvaluationType] = useState("");
   const [term, setTerm] = useState(TERMS[0]);
   const [coefficient, setCoefficient] = useState(1);
   const [scores, setScores] = useState({});
@@ -89,8 +91,22 @@ export default function GradesPage() {
     });
   }, [schoolId, classId, subjectId, selectedClass]);
 
-  const gradeDocId = classId && subject && term
-    ? `${classId}__${slugify(subject)}__${slugify(term)}`
+  // Le type d'évaluation dépend du niveau : une seule option en maternelle
+  // et primaire (sélectionnée automatiquement), un choix entre interrogation
+  // et devoir au secondaire.
+  const evaluationTypes = EVALUATION_TYPES_BY_LEVEL[selectedClass?.level] || [];
+
+  useEffect(() => {
+    if (evaluationTypes.length === 1) {
+      setEvaluationType(evaluationTypes[0]);
+    } else if (!evaluationTypes.includes(evaluationType)) {
+      setEvaluationType("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId, selectedClass?.level]);
+
+  const gradeDocId = classId && subject && term && evaluationType
+    ? `${classId}__${slugify(subject)}__${slugify(term)}__${slugify(evaluationType)}`
     : null;
 
   useEffect(() => {
@@ -125,6 +141,7 @@ export default function GradesPage() {
           className: selectedClass?.name || "",
           subject,
           subjectId,
+          evaluationType,
           term,
           coefficient: Number(coefficient) || 1,
           scores,
@@ -158,7 +175,7 @@ export default function GradesPage() {
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-line bg-surface p-6">
         <h2 className="font-display text-base text-ink mb-4">Sélectionner une évaluation</h2>
-        <div className="grid sm:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <FormField label="Classe">
             <Select value={classId} onChange={(e) => setClassId(e.target.value)}>
               <option value="">Choisir une classe</option>
@@ -181,6 +198,16 @@ export default function GradesPage() {
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Ex : Mathématiques"
               />
+            )}
+          </FormField>
+          <FormField label="Type d'évaluation">
+            {evaluationTypes.length > 1 ? (
+              <Select value={evaluationType} onChange={(e) => setEvaluationType(e.target.value)}>
+                <option value="">Choisir un type</option>
+                {evaluationTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+              </Select>
+            ) : (
+              <TextInput value={evaluationType} disabled placeholder="Choisissez d'abord une classe" />
             )}
           </FormField>
           <FormField label="Trimestre">
@@ -206,11 +233,11 @@ export default function GradesPage() {
         )}
       </div>
 
-      {classId && subject && (
+      {classId && subject && evaluationType && (
         <div className="rounded-xl border border-line bg-surface">
           <div className="flex items-center justify-between px-6 py-5">
             <h2 className="font-display text-base text-ink">
-              {selectedClass?.name} — {subject} — {term}
+              {selectedClass?.name} — {subject} — {evaluationType} — {term}
               {assignedTeacherName && (
                 <span className="block text-xs font-normal text-ink-soft mt-1">
                   Enseignant assigné : {assignedTeacherName}
