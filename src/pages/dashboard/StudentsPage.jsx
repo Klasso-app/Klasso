@@ -24,6 +24,15 @@ import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
 const FILTERS = ["Actifs", "Anciens / transférés", "Tous"];
 
+const DEFAULT_DOCUMENTS = [
+  "Acte de naissance",
+  "Livret ou carnet de santé",
+  "Photos d'identité",
+  "Bulletin de notes de l'année antérieure",
+  "Relevé de notes du CEP (pour la 6ème)",
+  "Fiche de renseignements",
+];
+
 export default function StudentsPage() {
   const { profile, firebaseUser } = useAuth();
   const schoolId = profile?.schoolId;
@@ -345,10 +354,35 @@ function StudentForm({ schoolId, classes, tuitionFees, editing, onDone }) {
     annualFees: editing?.annualFees ?? "",
     discountPercent: editing?.discountPercent ?? "",
   });
+  const [documents, setDocuments] = useState(
+    editing?.documents?.length
+      ? editing.documents
+      : DEFAULT_DOCUMENTS.map((name) => ({ name, provided: false, ...(name === "Photos d'identité" ? { quantity: 0 } : {}) }))
+  );
+  const [newDocName, setNewDocName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   function update(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  }
+
+  function toggleDocument(index) {
+    setDocuments((docs) => docs.map((d, i) => (i === index ? { ...d, provided: !d.provided } : d)));
+  }
+
+  function updateDocumentQuantity(index, value) {
+    setDocuments((docs) => docs.map((d, i) => (i === index ? { ...d, quantity: value === "" ? 0 : Number(value) } : d)));
+  }
+
+  function addCustomDocument() {
+    const name = newDocName.trim();
+    if (!name) return;
+    setDocuments((docs) => [...docs, { name, provided: true, custom: true }]);
+    setNewDocName("");
+  }
+
+  function removeCustomDocument(index) {
+    setDocuments((docs) => docs.filter((_, i) => i !== index));
   }
 
   function updateClassLabel(e) {
@@ -368,6 +402,7 @@ function StudentForm({ schoolId, classes, tuitionFees, editing, onDone }) {
         ...form,
         annualFees: form.annualFees === "" ? 0 : Number(form.annualFees),
         discountPercent: form.discountPercent === "" ? 0 : Number(form.discountPercent),
+        documents,
       };
       if (editing) {
         await updateDoc(doc(db, "schools", schoolId, "students", editing.id), payload);
@@ -458,6 +493,61 @@ function StudentForm({ schoolId, classes, tuitionFees, editing, onDone }) {
           sélectionner directement ici.
         </p>
       )}
+
+      <div>
+        <p className="text-sm font-medium text-ink mb-3">Pièces fournies</p>
+        <div className="flex flex-col gap-2">
+          {documents.map((docItem, index) => (
+            <div key={index} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-line">
+              <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={docItem.provided}
+                  onChange={() => toggleDocument(index)}
+                  className="w-4 h-4 shrink-0"
+                />
+                <span className="text-sm text-ink truncate">{docItem.name}</span>
+              </label>
+
+              {docItem.name === "Photos d'identité" && docItem.provided && (
+                <input
+                  type="number"
+                  min="0"
+                  value={docItem.quantity ?? 0}
+                  onChange={(e) => updateDocumentQuantity(index, e.target.value)}
+                  placeholder="Quantité"
+                  className="w-20 rounded-md border border-line px-2 py-1 text-sm text-center focus:border-indigo-500 shrink-0"
+                />
+              )}
+
+              {docItem.custom && (
+                <button
+                  type="button"
+                  onClick={() => removeCustomDocument(index)}
+                  className="text-xs text-danger shrink-0"
+                >
+                  Retirer
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 mt-3">
+          <TextInput
+            value={newDocName}
+            onChange={(e) => setNewDocName(e.target.value)}
+            placeholder="Ajouter une autre pièce (ex : Certificat médical)"
+          />
+          <button
+            type="button"
+            onClick={addCustomDocument}
+            className="text-sm text-indigo-600 border border-indigo-200 rounded-lg px-4 py-2.5 shrink-0"
+          >
+            Ajouter
+          </button>
+        </div>
+      </div>
 
       <div className="flex items-center gap-3 mt-2">
         <button
