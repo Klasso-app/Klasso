@@ -30,15 +30,16 @@ service cloud.firestore {
       return myProfile().role == 'directeur' || myProfile().role == 'secretaire';
     }
 
-    // Un enseignant ne peut écrire des notes que pour une classe/matière
-    // qui lui est assignée :
+    // Un enseignant ne peut écrire des notes ou des absences que pour une
+    // classe/matière qui lui est assignée :
     //  - en maternelle/primaire, la classe a un seul enseignant
     //    (classes/{id}.headTeacherId) ;
     //  - au secondaire, chaque matière d'une classe a son propre
     //    enseignant (classSubjectTeachers/{classId}__{subjectId}).
     // Par sécurité et pour ne jamais bloquer un usage existant, l'écriture
     // reste autorisée quand la classe ou l'affectation n'existe pas ou
-    // n'a pas encore été configurée (aucun enseignant assigné).
+    // n'a pas encore été configurée (aucun enseignant assigné), ou quand
+    // la donnée ne précise pas de matière (cas maternelle/primaire).
     function classData(schoolId, classId) {
       return get(/databases/$(database)/documents/schools/$(schoolId)/classes/$(classId)).data;
     }
@@ -47,14 +48,14 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/schools/$(schoolId)/classSubjectTeachers/$(classId + '__' + subjectId)).data;
     }
 
-    function isAssignedTeacherForGrade(schoolId, data) {
+    function isAssignedTeacherForRecord(schoolId, data) {
       return !exists(/databases/$(database)/documents/schools/$(schoolId)/classes/$(data.classId)) ||
         (
           classData(schoolId, data.classId).level != 'Secondaire'
             ? (classData(schoolId, data.classId).headTeacherId == null ||
                classData(schoolId, data.classId).headTeacherId == request.auth.uid)
             : (
-                data.subjectId == null ||
+                !("subjectId" in data) || data.subjectId == null ||
                 !exists(/databases/$(database)/documents/schools/$(schoolId)/classSubjectTeachers/$(data.classId + '__' + data.subjectId)) ||
                 assignmentData(schoolId, data.classId, data.subjectId).teacherId == null ||
                 assignmentData(schoolId, data.classId, data.subjectId).teacherId == request.auth.uid
@@ -62,8 +63,12 @@ service cloud.firestore {
         );
     }
 
-    function canWriteGrade(schoolId, data) {
-      return isStaff() || (myProfile().role == 'enseignant' && isAssignedTeacherForGrade(schoolId, data));
+    function canWriteScoped(schoolId, data) {
+      return isStaff() || (myProfile().role == 'enseignant' && isAssignedTeacherForRecord(schoolId, data));
+    }
+
+    function isScopedCollection(document) {
+      return document.split('/')[0] == 'grades' || document.split('/')[0] == 'absences';
     }
 
     // Profil utilisateur : chacun lit/modifie le sien. La création se fait
@@ -94,16 +99,17 @@ service cloud.firestore {
       allow update: if canEditSchool(schoolId);
 
       // Données pédagogiques : accessibles à tout membre de l'établissement,
-      // à l'exception de l'écriture sur "grades" (notes), restreinte à
-      // l'enseignant assigné (ou au personnel de direction/secrétariat).
-      // Le wildcard récursif couvre aussi les sous-collections profondes
-      // comme conversations/{uid}/messages, utilisées par la messagerie.
+      // à l'exception de l'écriture sur "grades" (notes) et "absences",
+      // restreinte à l'enseignant assigné (ou au personnel de
+      // direction/secrétariat). Le wildcard récursif couvre aussi les
+      // sous-collections profondes comme conversations/{uid}/messages,
+      // utilisées par la messagerie.
       match /{document=**} {
         allow read: if belongsToSchool(schoolId);
         allow create, update: if belongsToSchool(schoolId) &&
-          (document.split('/')[0] != 'grades' || canWriteGrade(schoolId, request.resource.data));
+          (!isScopedCollection(document) || canWriteScoped(schoolId, request.resource.data));
         allow delete: if belongsToSchool(schoolId) &&
-          (document.split('/')[0] != 'grades' || isStaff());
+          (!isScopedCollection(document) || isStaff());
       }
     }
 

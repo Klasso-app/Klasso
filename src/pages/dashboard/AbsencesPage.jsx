@@ -24,9 +24,11 @@ export default function AbsencesPage() {
   const [students, setStudents] = useState([]);
   const [absences, setAbsences] = useState([]);
   const [assignments, setAssignments] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [classId, setClassId] = useState("");
+  const [subject, setSubject] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [selected, setSelected] = useState({});
   const [saving, setSaving] = useState(false);
@@ -50,11 +52,16 @@ export default function AbsencesPage() {
       collection(db, "schools", schoolId, "classSubjectTeachers"),
       (snap) => setAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubSubjects = onSnapshot(
+      collection(db, "schools", schoolId, "subjects"),
+      (snap) => setSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
     return () => {
       unsubClasses();
       unsubStudents();
       unsubAbsences();
       unsubAssignments();
+      unsubSubjects();
     };
   }, [schoolId]);
 
@@ -64,10 +71,28 @@ export default function AbsencesPage() {
   );
 
   const selectedClass = classes.find((c) => c.id === classId);
+  const isSecondaire = selectedClass?.level === "Secondaire";
+
   const classStudents = useMemo(
     () => students.filter((s) => s.classLabel === selectedClass?.name),
     [students, selectedClass]
   );
+
+  // Au secondaire, un enseignant ne peut enregistrer l'absence que pour la
+  // matière qu'il donne à cette classe. Le personnel administratif voit
+  // toutes les matières.
+  const availableSubjects = useMemo(() => {
+    if (!isSecondaire) return [];
+    if (profile?.role !== "enseignant") return subjects;
+    const mySubjectNames = assignments
+      .filter((a) => a.classId === classId && a.teacherId === profile.id)
+      .map((a) => a.subject);
+    return subjects.filter((s) => mySubjectNames.includes(s.name));
+  }, [isSecondaire, subjects, assignments, classId, profile]);
+
+  useEffect(() => {
+    setSubject("");
+  }, [classId]);
 
   function toggle(studentId) {
     setSelected((s) => ({ ...s, [studentId]: !s[studentId] }));
@@ -78,12 +103,16 @@ export default function AbsencesPage() {
     if (toRecord.length === 0) return;
     setSaving(true);
     try {
+      const selectedSubject = availableSubjects.find((s) => s.name === subject);
       await Promise.all(
         toRecord.map((s) =>
           addDoc(collection(db, "schools", schoolId, "absences"), {
             studentId: s.id,
             studentName: s.fullName,
+            classId,
             classLabel: s.classLabel,
+            subject: isSecondaire ? subject : "",
+            subjectId: isSecondaire ? selectedSubject?.id || null : null,
             date,
             justified: false,
             createdAt: serverTimestamp(),
@@ -117,23 +146,41 @@ export default function AbsencesPage() {
     );
   }
 
+  const canShowChecklist = classId && (!isSecondaire || subject);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-line bg-surface p-6">
-        <h2 className="font-display text-base text-ink mb-4">Enregistrer les absences du jour</h2>
-        <div className="grid sm:grid-cols-2 gap-4 mb-4">
+        <h2 className="font-display text-base text-ink mb-4">Enregistrer les absences</h2>
+        <div className={`grid gap-4 mb-4 ${isSecondaire ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           <FormField label="Classe">
             <Select value={classId} onChange={(e) => setClassId(e.target.value)}>
               <option value="">Choisir une classe</option>
               {accessibleClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           </FormField>
+
+          {isSecondaire && (
+            <FormField label="Matière (cours)">
+              {availableSubjects.length > 0 ? (
+                <Select value={subject} onChange={(e) => setSubject(e.target.value)}>
+                  <option value="">Choisir une matière</option>
+                  {availableSubjects.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                </Select>
+              ) : (
+                <p className="text-xs text-ink-soft py-2.5">
+                  Aucune matière ne vous est attribuée pour cette classe.
+                </p>
+              )}
+            </FormField>
+          )}
+
           <FormField label="Date">
             <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </FormField>
         </div>
 
-        {classId && classStudents.length > 0 && (
+        {canShowChecklist && classStudents.length > 0 && (
           <>
             <div className="flex flex-col gap-2 mb-4">
               {classStudents.map((s) => (
@@ -176,6 +223,7 @@ export default function AbsencesPage() {
                 <tr className="text-left text-xs text-ink-soft border-t border-line">
                   <th className="px-6 py-3 font-medium">Élève</th>
                   <th className="px-6 py-3 font-medium">Classe</th>
+                  <th className="px-6 py-3 font-medium">Matière</th>
                   <th className="px-6 py-3 font-medium">Date</th>
                   <th className="px-6 py-3 font-medium"></th>
                 </tr>
@@ -185,6 +233,7 @@ export default function AbsencesPage() {
                   <tr key={a.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{a.studentName}</td>
                     <td className="px-6 py-3 text-ink-soft">{a.classLabel}</td>
+                    <td className="px-6 py-3 text-ink-soft">{a.subject || "—"}</td>
                     <td className="px-6 py-3 text-ink-soft">{a.date}</td>
                     <td className="px-6 py-3">
                       <button onClick={() => handleDelete(a)} className="text-xs text-danger">
