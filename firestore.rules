@@ -67,8 +67,15 @@ service cloud.firestore {
       return isStaff() || (myProfile().role == 'enseignant' && isAssignedTeacherForRecord(schoolId, data));
     }
 
-    function isScopedCollection(document) {
+    function isScopedTeachingCollection(document) {
       return document.split('/')[0] == 'grades' || document.split('/')[0] == 'absences';
+    }
+
+    // L'emploi du temps n'est créé et modifié que par le directeur ou la
+    // secrétaire — ni un enseignant, ni un parent, même si l'interface le
+    // leur cachait déjà.
+    function isAdminOnlyCollection(document) {
+      return document.split('/')[0] == 'schedule';
     }
 
     // Profil utilisateur : chacun lit/modifie le sien. La création se fait
@@ -106,10 +113,15 @@ service cloud.firestore {
       // utilisées par la messagerie.
       match /{document=**} {
         allow read: if belongsToSchool(schoolId);
-        allow create, update: if belongsToSchool(schoolId) &&
-          (!isScopedCollection(document) || canWriteScoped(schoolId, request.resource.data));
-        allow delete: if belongsToSchool(schoolId) &&
-          (!isScopedCollection(document) || isStaff());
+        allow create, update: if belongsToSchool(schoolId) && (
+          (isScopedTeachingCollection(document) && canWriteScoped(schoolId, request.resource.data)) ||
+          (isAdminOnlyCollection(document) && isStaff()) ||
+          (!isScopedTeachingCollection(document) && !isAdminOnlyCollection(document))
+        );
+        allow delete: if belongsToSchool(schoolId) && (
+          isStaff() ||
+          (!isScopedTeachingCollection(document) && !isAdminOnlyCollection(document))
+        );
       }
     }
 
