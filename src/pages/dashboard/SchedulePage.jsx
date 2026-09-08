@@ -30,6 +30,7 @@ export default function SchedulePage() {
   const [slots, setSlots] = useState([]);
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [childrenClassNames, setChildrenClassNames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +51,9 @@ export default function SchedulePage() {
     const unsubTeachers = onSnapshot(collection(db, "schools", schoolId, "teachers"), (snap) =>
       setTeachers(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubSubjects = onSnapshot(collection(db, "schools", schoolId, "subjects"), (snap) =>
+      setSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
     const unsubAssignments = onSnapshot(
       collection(db, "schools", schoolId, "classSubjectTeachers"),
       (snap) => setAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
@@ -58,6 +62,7 @@ export default function SchedulePage() {
       unsubSlots();
       unsubClasses();
       unsubTeachers();
+      unsubSubjects();
       unsubAssignments();
     };
   }, [schoolId]);
@@ -126,6 +131,7 @@ export default function SchedulePage() {
           schoolId={schoolId}
           classes={accessibleClasses}
           teachers={teachers}
+          subjects={subjects}
           onDone={() => setShowForm(false)}
         />
       )}
@@ -186,7 +192,7 @@ export default function SchedulePage() {
   );
 }
 
-function NewSlotForm({ schoolId, classes, teachers, onDone }) {
+function NewSlotForm({ schoolId, classes, teachers, subjects, onDone }) {
   const [form, setForm] = useState({
     day: DAYS[0],
     startTime: "08:00",
@@ -247,7 +253,14 @@ function NewSlotForm({ schoolId, classes, teachers, onDone }) {
           <TextInput required type="time" value={form.endTime} onChange={update("endTime")} />
         </FormField>
         <FormField label="Matière">
-          <TextInput required value={form.subject} onChange={update("subject")} />
+          {subjects.length > 0 ? (
+            <Select required value={form.subject} onChange={update("subject")}>
+              <option value="">Sélectionner une matière</option>
+              {subjects.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+            </Select>
+          ) : (
+            <TextInput required value={form.subject} onChange={update("subject")} placeholder="Ex : Mathématiques" />
+          )}
         </FormField>
         <FormField label="Enseignant">
           <Select value={form.teacherId} onChange={update("teacherId")}>
