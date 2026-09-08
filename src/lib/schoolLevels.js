@@ -19,3 +19,17 @@ export const EVALUATION_TYPES_BY_LEVEL = {
   Primaire: ["Évaluation"],
   Secondaire: ["Interrogation", "Devoir"],
 };
+
+// Ordre naturel de progression, toutes classes confondues, utilisé pour le
+// passage en classe supérieure en fin d'année.
+const ALL_CLASSES_IN_ORDER = [
+  ...CLASS_NAMES_BY_LEVEL.Maternelle,
+  ...CLASS_NAMES_BY_LEVEL.Primaire,
+  ...CLASS_NAMES_BY_LEVEL.Secondaire,
+];
+
+export function nextClassName(current) {
+  const idx = ALL_CLASSES_IN_ORDER.indexOf(current);
+  if (idx === -1 || idx === ALL_CLASSES_IN_ORDER.length - 1) return null;
+  return ALL_CLASSES_IN_ORDER[idx + 1];
+}
