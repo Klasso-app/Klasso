@@ -68,14 +68,14 @@ service cloud.firestore {
     }
 
     function isScopedTeachingCollection(document) {
-      return document.split('/')[0] == 'grades' || document.split('/')[0] == 'absences';
+      return document[0] == 'grades' || document[0] == 'absences';
     }
 
     // L'emploi du temps n'est créé et modifié que par le directeur ou la
     // secrétaire — ni un enseignant, ni un parent, même si l'interface le
     // leur cachait déjà.
     function isAdminOnlyCollection(document) {
-      return document.split('/')[0] == 'schedule';
+      return document[0] == 'schedule';
     }
 
     // Profil utilisateur : chacun lit/modifie le sien. La création se fait
