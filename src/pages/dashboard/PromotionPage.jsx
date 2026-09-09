@@ -6,6 +6,7 @@ import { logAction } from "../../lib/auditLog";
 import { getAccessibleClasses } from "../../lib/scope";
 import { nextClassName } from "../../lib/schoolLevels";
 import { nextSchoolYear } from "../../lib/schoolYear";
+import { fetchAllGrades, averageForStudent } from "../../lib/grades";
 import { IconLayers, IconShield } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { Select } from "../../components/auth/FormField";
@@ -20,6 +21,7 @@ export default function PromotionPage() {
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
   const [tuitionFees, setTuitionFees] = useState({});
+  const [grades, setGrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [classId, setClassId] = useState("");
   const [decisions, setDecisions] = useState({});
@@ -40,10 +42,14 @@ export default function PromotionPage() {
       snap.docs.forEach((d) => { map[d.id] = d.data().amount; });
       setTuitionFees(map);
     });
+    const unsubGrades = onSnapshot(collection(db, "schools", schoolId, "grades"), (snap) =>
+      setGrades(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
     return () => {
       unsubClasses();
       unsubStudents();
       unsubFees();
+      unsubGrades();
     };
   }, [schoolId]);
 
@@ -191,26 +197,35 @@ export default function PromotionPage() {
                   <thead>
                     <tr className="text-left text-xs text-ink-soft border-t border-line">
                       <th className="px-6 py-3 font-medium">Élève</th>
+                      {selectedClass.level === "Secondaire" && (
+                        <th className="px-6 py-3 font-medium">Moyenne finale</th>
+                      )}
                       <th className="px-6 py-3 font-medium">Décision</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {classStudents.map((s) => (
-                      <tr key={s.id} className="border-t border-line">
-                        <td className="px-6 py-3 text-ink">{s.fullName}</td>
-                        <td className="px-6 py-3">
-                          <select
-                            value={decisionFor(s.id)}
-                            onChange={(e) => setDecision(s.id, e.target.value)}
-                            className="w-full sm:w-64 rounded-lg border border-line px-3 py-1.5 text-sm focus:border-indigo-500"
-                          >
-                            {decisionOptionsFor(selectedClass.name).map((opt) => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
+                    {classStudents.map((s) => {
+                      const avg = selectedClass.level === "Secondaire" ? averageForStudent(grades, s.id) : null;
+                      return (
+                        <tr key={s.id} className="border-t border-line">
+                          <td className="px-6 py-3 text-ink">{s.fullName}</td>
+                          {selectedClass.level === "Secondaire" && (
+                            <td className="px-6 py-3 text-ink-soft">{avg === null ? "—" : `${avg} / 20`}</td>
+                          )}
+                          <td className="px-6 py-3">
+                            <select
+                              value={decisionFor(s.id)}
+                              onChange={(e) => setDecision(s.id, e.target.value)}
+                              className="w-full sm:w-64 rounded-lg border border-line px-3 py-1.5 text-sm focus:border-indigo-500"
+                            >
+                              {decisionOptionsFor(selectedClass.name).map((opt) => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
