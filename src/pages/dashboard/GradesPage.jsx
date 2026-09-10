@@ -15,6 +15,7 @@ import { averageForStudent } from "../../lib/grades";
 import { downloadBulletin } from "../../lib/bulletin";
 import { getAccessibleClasses } from "../../lib/scope";
 import { EVALUATION_TYPES_BY_LEVEL } from "../../lib/schoolLevels";
+import { currentSchoolYear } from "../../lib/schoolYear";
 import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { Select, TextInput } from "../../components/auth/FormField";
 import { IconChart, IconFile } from "../../components/icons";
@@ -105,8 +106,10 @@ export default function GradesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId, selectedClass?.level]);
 
+  const schoolYear = currentSchoolYear();
+
   const gradeDocId = classId && subject && term && evaluationType
-    ? `${classId}__${slugify(subject)}__${slugify(term)}__${slugify(evaluationType)}`
+    ? `${classId}__${slugify(subject)}__${slugify(term)}__${slugify(evaluationType)}__${slugify(schoolYear)}`
     : null;
 
   useEffect(() => {
@@ -143,6 +146,7 @@ export default function GradesPage() {
           subjectId,
           evaluationType,
           term,
+          schoolYear,
           coefficient: Number(coefficient) || 1,
           scores,
           updatedAt: serverTimestamp(),
@@ -341,9 +345,10 @@ function ClassAverages({ schoolId, school, students, classId }) {
 
   if (students.length === 0) return null;
 
+  const yearGrades = grades.filter((g) => (g.schoolYear || currentSchoolYear()) === currentSchoolYear());
   const relevantGrades = bulletinTerm === "Toutes les périodes"
-    ? grades
-    : grades.filter((g) => g.term === bulletinTerm);
+    ? yearGrades
+    : yearGrades.filter((g) => g.term === bulletinTerm);
 
   const ranked = students
     .map((s) => ({ student: s, average: averageForStudent(relevantGrades, s.id) }))
@@ -390,7 +395,7 @@ function ClassAverages({ schoolId, school, students, classId }) {
                     onClick={() => downloadBulletin({
                       school,
                       student: s,
-                      grades,
+                      grades: yearGrades,
                       term: bulletinTerm,
                       rank: avg === null ? null : index + 1,
                       totalStudents: students.length,

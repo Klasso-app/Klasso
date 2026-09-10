@@ -3,6 +3,7 @@ import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { averageForStudent } from "../../lib/grades";
+import { currentSchoolYear } from "../../lib/schoolYear";
 import EmptyState from "../../components/dashboard/EmptyState";
 import { IconUsers } from "../../components/icons";
 
@@ -51,7 +52,7 @@ export default function ParentHomePage() {
   return (
     <div className="flex flex-col gap-6">
       {children.map((child) => {
-        const avg = averageForStudent(grades, child.id);
+        const avg = averageForStudent(grades, child.id, child.schoolYear || currentSchoolYear());
         return (
           <div key={child.id} className="rounded-xl border border-line bg-surface p-6">
             <h2 className="font-display text-lg text-ink">{child.fullName}</h2>

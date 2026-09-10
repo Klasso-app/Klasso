@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { logAction } from "../../lib/auditLog";
 import { getAccessibleClasses } from "../../lib/scope";
 import { nextClassName } from "../../lib/schoolLevels";
-import { nextSchoolYear } from "../../lib/schoolYear";
+import { nextSchoolYear, currentSchoolYear } from "../../lib/schoolYear";
 import { fetchAllGrades, averageForStudent } from "../../lib/grades";
 import { IconLayers, IconShield } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
@@ -205,7 +205,9 @@ export default function PromotionPage() {
                   </thead>
                   <tbody>
                     {classStudents.map((s) => {
-                      const avg = selectedClass.level === "Secondaire" ? averageForStudent(grades, s.id) : null;
+                      const avg = selectedClass.level === "Secondaire"
+                        ? averageForStudent(grades, s.id, s.schoolYear || currentSchoolYear())
+                        : null;
                       return (
                         <tr key={s.id} className="border-t border-line">
                           <td className="px-6 py-3 text-ink">{s.fullName}</td>

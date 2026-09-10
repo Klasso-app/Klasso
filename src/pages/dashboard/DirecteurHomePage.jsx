@@ -12,6 +12,7 @@ import {
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { fetchAllGrades, schoolAverage } from "../../lib/grades";
+import { currentSchoolYear } from "../../lib/schoolYear";
 import { getAccessibleClasses } from "../../lib/scope";
 import StatCard from "../../components/dashboard/StatCard";
 import EmptyState from "../../components/dashboard/EmptyState";
@@ -92,7 +93,7 @@ export default function DirecteurHomePage() {
       }
       const grades = await fetchAllGrades(schoolId);
       const studentIds = studentsSnap.docs.map((d) => d.id);
-      setAvgGrade(schoolAverage(grades, studentIds));
+      setAvgGrade(schoolAverage(grades, studentIds, currentSchoolYear()));
     }
 
     async function loadRecentStudents(classNames) {

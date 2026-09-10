@@ -3,6 +3,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { averageForStudent } from "../../lib/grades";
+import { currentSchoolYear } from "../../lib/schoolYear";
 import { exportToCsv } from "../../lib/csv";
 import { getAccessibleClasses } from "../../lib/scope";
 import EmptyState from "../../components/dashboard/EmptyState";
@@ -47,7 +48,7 @@ export default function StatsPage() {
     return accessibleClasses.map((c) => {
       const classStudents = students.filter((s) => s.classLabel === c.name);
       const averages = classStudents
-        .map((s) => averageForStudent(grades, s.id))
+        .map((s) => averageForStudent(grades, s.id, currentSchoolYear()))
         .filter((v) => v !== null);
       const classAverage = averages.length
         ? Math.round((averages.reduce((a, b) => a + b, 0) / averages.length) * 100) / 100
@@ -62,6 +63,7 @@ export default function StatsPage() {
     const bySubject = {};
     grades.forEach((g) => {
       if (!g.subject) return;
+      if ((g.schoolYear || currentSchoolYear()) !== currentSchoolYear()) return;
       if (g.className && !accessibleNames.has(g.className)) return;
       const scores = Object.values(g.scores || {}).filter((v) => typeof v === "number");
       if (scores.length === 0) return;
