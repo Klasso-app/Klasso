@@ -206,7 +206,7 @@ export default function PromotionPage() {
                   <tbody>
                     {classStudents.map((s) => {
                       const avg = selectedClass.level === "Secondaire"
-                        ? averageForStudent(grades, s.id, s.schoolYear || currentSchoolYear())
+                        ? averageForStudent(grades, s.id, currentSchoolYear())
                         : null;
                       return (
                         <tr key={s.id} className="border-t border-line">

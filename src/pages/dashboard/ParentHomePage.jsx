@@ -52,7 +52,7 @@ export default function ParentHomePage() {
   return (
     <div className="flex flex-col gap-6">
       {children.map((child) => {
-        const avg = averageForStudent(grades, child.id, child.schoolYear || currentSchoolYear());
+        const avg = averageForStudent(grades, child.id, currentSchoolYear());
         return (
           <div key={child.id} className="rounded-xl border border-line bg-surface p-6">
             <h2 className="font-display text-lg text-ink">{child.fullName}</h2>
