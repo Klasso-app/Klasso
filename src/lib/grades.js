@@ -9,13 +9,15 @@
 //
 // La moyenne est pondérée par les coefficients de chaque matière.
 //
-// Important : les fonctions ci-dessous acceptent un paramètre `schoolYear`
-// optionnel pour ne calculer une moyenne que sur une année scolaire
-// précise. Sans lui, tout l'historique serait mélangé — un élève qui passe
-// de 5ème en 4ème garderait sinon la moyenne de sa 5ème affichée sur sa
-// nouvelle classe. Les notes enregistrées avant l'ajout de ce champ (donc
-// sans `schoolYear`) sont considérées comme appartenant à l'année en cours,
-// pour ne rien faire disparaître rétroactivement.
+// Important : les fonctions ci-dessous filtrent par ANNÉE SCOLAIRE et, si
+// fourni, par CLASSE (className). Les deux sont nécessaires : l'année seule
+// ne suffit pas si un passage de classe est simulé dans la même année
+// civile (tests, ou changement de classe en cours d'année) — filtrer aussi
+// sur la classe garantit qu'un élève qui change de classe reparte avec des
+// notes vierges pour sa nouvelle classe, quelle que soit la date réelle.
+// Les notes enregistrées avant l'ajout du champ `schoolYear` sont
+// considérées comme appartenant à l'année en cours, pour ne rien faire
+// disparaître rétroactivement.
 
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
@@ -26,13 +28,19 @@ export async function fetchAllGrades(schoolId) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-function filterByYear(grades, schoolYear) {
-  if (!schoolYear) return grades;
-  return grades.filter((g) => (g.schoolYear || currentSchoolYear()) === schoolYear);
+function filterScope(grades, schoolYear, className) {
+  let scoped = grades;
+  if (schoolYear) {
+    scoped = scoped.filter((g) => (g.schoolYear || currentSchoolYear()) === schoolYear);
+  }
+  if (className) {
+    scoped = scoped.filter((g) => g.className === className);
+  }
+  return scoped;
 }
 
-export function averageForStudent(grades, studentId, schoolYear) {
-  const scoped = filterByYear(grades, schoolYear);
+export function averageForStudent(grades, studentId, schoolYear, className) {
+  const scoped = filterScope(grades, schoolYear, className);
   const entries = scoped
     .filter((g) => typeof g.scores?.[studentId] === "number")
     .map((g) => ({ score: g.scores[studentId], coefficient: g.coefficient || 1 }));
@@ -57,8 +65,8 @@ export function schoolAverage(grades, studentIds, schoolYear) {
 // Détail matière par matière pour un élève, utilisé pour générer le
 // bulletin. Regroupe par matière + trimestre (au cas où plusieurs
 // évaluations existeraient pour la même combinaison).
-export function subjectBreakdownForStudent(grades, studentId, schoolYear) {
-  const scoped = filterByYear(grades, schoolYear);
+export function subjectBreakdownForStudent(grades, studentId, schoolYear, className) {
+  const scoped = filterScope(grades, schoolYear, className);
   return scoped
     .filter((g) => typeof g.scores?.[studentId] === "number")
     .map((g) => ({

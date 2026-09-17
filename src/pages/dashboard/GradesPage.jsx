@@ -300,13 +300,13 @@ export default function GradesPage() {
       )}
 
       {classId && (
-        <ClassAverages schoolId={schoolId} school={school} students={classStudents} classId={classId} />
+        <ClassAverages schoolId={schoolId} school={school} students={classStudents} classId={classId} className={selectedClass?.name} />
       )}
     </div>
   );
 }
 
-function ClassAverages({ schoolId, school, students, classId }) {
+function ClassAverages({ schoolId, school, students, classId, className }) {
   const [grades, setGrades] = useState([]);
   const [appreciations, setAppreciations] = useState({});
   const [bulletinTerm, setBulletinTerm] = useState("Toutes les périodes");
@@ -346,9 +346,10 @@ function ClassAverages({ schoolId, school, students, classId }) {
   if (students.length === 0) return null;
 
   const yearGrades = grades.filter((g) => (g.schoolYear || currentSchoolYear()) === currentSchoolYear());
+  const classGrades = className ? yearGrades.filter((g) => g.className === className) : yearGrades;
   const relevantGrades = bulletinTerm === "Toutes les périodes"
-    ? yearGrades
-    : yearGrades.filter((g) => g.term === bulletinTerm);
+    ? classGrades
+    : classGrades.filter((g) => g.term === bulletinTerm);
 
   const ranked = students
     .map((s) => ({ student: s, average: averageForStudent(relevantGrades, s.id) }))
@@ -395,7 +396,7 @@ function ClassAverages({ schoolId, school, students, classId }) {
                     onClick={() => downloadBulletin({
                       school,
                       student: s,
-                      grades: yearGrades,
+                      grades: classGrades,
                       term: bulletinTerm,
                       rank: avg === null ? null : index + 1,
                       totalStudents: students.length,

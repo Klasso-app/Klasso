@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
-import { fetchAllGrades, schoolAverage } from "../../lib/grades";
+import { fetchAllGrades, averageForStudent } from "../../lib/grades";
 import { currentSchoolYear } from "../../lib/schoolYear";
 import { getAccessibleClasses } from "../../lib/scope";
 import StatCard from "../../components/dashboard/StatCard";
@@ -92,8 +92,16 @@ export default function DirecteurHomePage() {
         );
       }
       const grades = await fetchAllGrades(schoolId);
-      const studentIds = studentsSnap.docs.map((d) => d.id);
-      setAvgGrade(schoolAverage(grades, studentIds, currentSchoolYear()));
+      const yearGrades = grades.filter((g) => (g.schoolYear || currentSchoolYear()) === currentSchoolYear());
+      const students = studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const averages = students
+        .map((s) => averageForStudent(yearGrades, s.id, currentSchoolYear(), s.classLabel))
+        .filter((v) => v !== null);
+      setAvgGrade(
+        averages.length
+          ? Math.round((averages.reduce((a, b) => a + b, 0) / averages.length) * 100) / 100
+          : null
+      );
     }
 
     async function loadRecentStudents(classNames) {
