@@ -16,6 +16,7 @@ import { logAction } from "../../lib/auditLog";
 import { LEVELS } from "../../lib/schoolLevels";
 import { IconPlus, IconClipboard, IconCalendar, IconChart } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
+import SearchInput from "../../components/dashboard/SearchInput";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
 const TABS = ["Fiches", "Pointage", "Évaluations", "Congés"];
@@ -88,6 +89,14 @@ function TeacherRecords({ schoolId, teachers, subjects, loading }) {
   const { profile, firebaseUser } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [search, setSearch] = useState("");
+
+  const visibleTeachers = search.trim()
+    ? teachers.filter((t) =>
+        [t.fullName, t.level, t.phone, t.contractType]
+          .some((v) => (v || "").toLowerCase().includes(search.trim().toLowerCase()))
+      )
+    : teachers;
 
   async function handleDelete(teacher) {
     if (!window.confirm(`Supprimer ${teacher.fullName} de la liste des enseignants ?`)) return;
@@ -107,15 +116,23 @@ function TeacherRecords({ schoolId, teachers, subjects, loading }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p className="text-sm text-ink-soft">{teachers.length} enseignant{teachers.length > 1 ? "s" : ""}</p>
-        <button
-          onClick={() => { setEditing(null); setShowForm((v) => !v); }}
-          className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
-        >
-          <IconPlus className="w-4 h-4" />
-          Nouvel enseignant
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Rechercher un enseignant, un téléphone..."
+            className="sm:w-64"
+          />
+          <button
+            onClick={() => { setEditing(null); setShowForm((v) => !v); }}
+            className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
+          >
+            <IconPlus className="w-4 h-4" />
+            Nouvel enseignant
+          </button>
+        </div>
       </div>
 
       {(showForm || editing) && (
@@ -123,11 +140,11 @@ function TeacherRecords({ schoolId, teachers, subjects, loading }) {
       )}
 
       <div className="rounded-xl border border-line bg-surface">
-        {!loading && teachers.length === 0 ? (
+        {!loading && visibleTeachers.length === 0 ? (
           <EmptyState
             icon={IconClipboard}
-            title="Aucun enseignant enregistré"
-            text="Ajoutez vos enseignants pour pouvoir ensuite les affecter à des classes et matières."
+            title={teachers.length === 0 ? "Aucun enseignant enregistré" : "Aucun résultat"}
+            text={teachers.length === 0 ? "Ajoutez vos enseignants pour pouvoir ensuite les affecter à des classes et matières." : "Aucun enseignant ne correspond à cette recherche."}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -144,7 +161,7 @@ function TeacherRecords({ schoolId, teachers, subjects, loading }) {
                 </tr>
               </thead>
               <tbody>
-                {teachers.map((t) => (
+                {visibleTeachers.map((t) => (
                   <tr key={t.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{t.fullName}</td>
                     <td className="px-6 py-3 text-ink-soft">{t.level || "—"}</td>

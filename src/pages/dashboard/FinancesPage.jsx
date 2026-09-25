@@ -16,6 +16,7 @@ import { exportToCsv } from "../../lib/csv";
 import { getAccessibleClasses } from "../../lib/scope";
 import { IconPlus, IconWallet, IconFile } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
+import SearchInput from "../../components/dashboard/SearchInput";
 import StatCard from "../../components/dashboard/StatCard";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
@@ -34,6 +35,8 @@ export default function FinancesPage() {
   const [loading, setLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [paymentSearch, setPaymentSearch] = useState("");
+  const [expenseSearch, setExpenseSearch] = useState("");
 
   useEffect(() => {
     if (!schoolId) return;
@@ -83,6 +86,22 @@ export default function FinancesPage() {
     () => payments.filter((p) => scopedStudentIds.has(p.studentId)),
     [payments, scopedStudentIds]
   );
+
+  const visiblePayments = useMemo(() => {
+    const term = paymentSearch.trim().toLowerCase();
+    if (!term) return scopedPayments;
+    return scopedPayments.filter((p) =>
+      [p.studentName, p.feeType, p.method].some((v) => (v || "").toLowerCase().includes(term))
+    );
+  }, [scopedPayments, paymentSearch]);
+
+  const visibleExpenses = useMemo(() => {
+    const term = expenseSearch.trim().toLowerCase();
+    if (!term) return expenses;
+    return expenses.filter((e) =>
+      [e.label, e.category].some((v) => (v || "").toLowerCase().includes(term))
+    );
+  }, [expenses, expenseSearch]);
 
   const totalIncome = useMemo(
     () => scopedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
@@ -232,15 +251,23 @@ export default function FinancesPage() {
       )}
 
       {/* Paiements */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="font-display text-base text-ink">Paiements enregistrés</h2>
-        <button
-          onClick={() => setShowPaymentForm((v) => !v)}
-          className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
-        >
-          <IconPlus className="w-4 h-4" />
-          Enregistrer un paiement
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <SearchInput
+            value={paymentSearch}
+            onChange={setPaymentSearch}
+            placeholder="Rechercher un élève, un moyen..."
+            className="sm:w-64"
+          />
+          <button
+            onClick={() => setShowPaymentForm((v) => !v)}
+            className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
+          >
+            <IconPlus className="w-4 h-4" />
+            Enregistrer un paiement
+          </button>
+        </div>
       </div>
 
       {showPaymentForm && (
@@ -248,8 +275,12 @@ export default function FinancesPage() {
       )}
 
       <div className="rounded-xl border border-line bg-surface">
-        {!loading && scopedPayments.length === 0 ? (
-          <EmptyState icon={IconWallet} title="Aucun paiement enregistré" text="Enregistrez les frais de scolarité au fur et à mesure des paiements." />
+        {!loading && visiblePayments.length === 0 ? (
+          <EmptyState
+            icon={IconWallet}
+            title={scopedPayments.length === 0 ? "Aucun paiement enregistré" : "Aucun résultat"}
+            text={scopedPayments.length === 0 ? "Enregistrez les frais de scolarité au fur et à mesure des paiements." : "Aucun paiement ne correspond à cette recherche."}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -264,7 +295,7 @@ export default function FinancesPage() {
                 </tr>
               </thead>
               <tbody>
-                {scopedPayments.map((p) => (
+                {visiblePayments.map((p) => (
                   <tr key={p.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{p.studentName}</td>
                     <td className="px-6 py-3 text-ink-soft">{p.feeType || "Scolarité"}</td>
@@ -294,15 +325,23 @@ export default function FinancesPage() {
       </div>
 
       {/* Dépenses */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="font-display text-base text-ink">Dépenses de l'établissement</h2>
-        <button
-          onClick={() => setShowExpenseForm((v) => !v)}
-          className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
-        >
-          <IconPlus className="w-4 h-4" />
-          Ajouter une dépense
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <SearchInput
+            value={expenseSearch}
+            onChange={setExpenseSearch}
+            placeholder="Rechercher un libellé, une catégorie..."
+            className="sm:w-64"
+          />
+          <button
+            onClick={() => setShowExpenseForm((v) => !v)}
+            className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
+          >
+            <IconPlus className="w-4 h-4" />
+            Ajouter une dépense
+          </button>
+        </div>
       </div>
 
       {showExpenseForm && (
@@ -310,8 +349,12 @@ export default function FinancesPage() {
       )}
 
       <div className="rounded-xl border border-line bg-surface">
-        {expenses.length === 0 ? (
-          <EmptyState icon={IconWallet} title="Aucune dépense enregistrée" text="Suivez ici les sorties d'argent de l'établissement (salaires, fournitures, entretien...)." />
+        {visibleExpenses.length === 0 ? (
+          <EmptyState
+            icon={IconWallet}
+            title={expenses.length === 0 ? "Aucune dépense enregistrée" : "Aucun résultat"}
+            text={expenses.length === 0 ? "Suivez ici les sorties d'argent de l'établissement (salaires, fournitures, entretien...)." : "Aucune dépense ne correspond à cette recherche."}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -325,7 +368,7 @@ export default function FinancesPage() {
                 </tr>
               </thead>
               <tbody>
-                {expenses.map((e) => (
+                {visibleExpenses.map((e) => (
                   <tr key={e.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{e.label}</td>
                     <td className="px-6 py-3 text-ink-soft">{e.category}</td>

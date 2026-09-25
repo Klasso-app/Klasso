@@ -14,6 +14,7 @@ import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { IconPlus, IconFile } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
+import SearchInput from "../../components/dashboard/SearchInput";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
 const TABS = ["Catalogue", "Emprunts"];
@@ -80,6 +81,13 @@ export default function LibraryPage() {
 
 function Catalogue({ schoolId, books, availability, loading }) {
   const [showForm, setShowForm] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const visibleBooks = search.trim()
+    ? books.filter((b) =>
+        [b.title, b.author].some((v) => (v || "").toLowerCase().includes(search.trim().toLowerCase()))
+      )
+    : books;
 
   async function handleDelete(book) {
     if (!window.confirm(`Retirer « ${book.title} » du catalogue ?`)) return;
@@ -88,22 +96,34 @@ function Catalogue({ schoolId, books, availability, loading }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p className="text-sm text-ink-soft">{books.length} titre{books.length > 1 ? "s" : ""}</p>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
-        >
-          <IconPlus className="w-4 h-4" />
-          Ajouter un livre
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Rechercher un titre, un auteur..."
+            className="sm:w-64"
+          />
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
+          >
+            <IconPlus className="w-4 h-4" />
+            Ajouter un livre
+          </button>
+        </div>
       </div>
 
       {showForm && <NewBookForm schoolId={schoolId} onDone={() => setShowForm(false)} />}
 
       <div className="rounded-xl border border-line bg-surface">
-        {!loading && books.length === 0 ? (
-          <EmptyState icon={IconFile} title="Aucun livre au catalogue" text="Ajoutez les ouvrages disponibles pour les élèves." />
+        {!loading && visibleBooks.length === 0 ? (
+          <EmptyState
+            icon={IconFile}
+            title={books.length === 0 ? "Aucun livre au catalogue" : "Aucun résultat"}
+            text={books.length === 0 ? "Ajoutez les ouvrages disponibles pour les élèves." : "Aucun livre ne correspond à cette recherche."}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -117,7 +137,7 @@ function Catalogue({ schoolId, books, availability, loading }) {
                 </tr>
               </thead>
               <tbody>
-                {books.map((b) => (
+                {visibleBooks.map((b) => (
                   <tr key={b.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{b.title}</td>
                     <td className="px-6 py-3 text-ink-soft">{b.author || "—"}</td>

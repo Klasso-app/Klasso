@@ -19,6 +19,7 @@ import { LEVELS, CLASS_NAMES_BY_LEVEL } from "../../lib/schoolLevels";
 import { getAccessibleClasses } from "../../lib/scope";
 import { IconPlus, IconLayers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
+import SearchInput from "../../components/dashboard/SearchInput";
 import FormField, { Select } from "../../components/auth/FormField";
 
 export default function ClassesPage() {
@@ -35,6 +36,7 @@ export default function ClassesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [assigningClass, setAssigningClass] = useState(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (!schoolId) return;
@@ -72,7 +74,14 @@ export default function ClassesPage() {
     };
   }, [schoolId]);
 
-  const visibleClasses = getAccessibleClasses({ profile, classes, assignments });
+  const scopedClasses = getAccessibleClasses({ profile, classes, assignments });
+
+  const visibleClasses = search.trim()
+    ? scopedClasses.filter((c) =>
+        [c.name, c.level, c.headTeacherName]
+          .some((v) => (v || "").toLowerCase().includes(search.trim().toLowerCase()))
+      )
+    : scopedClasses;
 
   function studentCount(className) {
     return students.filter((s) => s.classLabel === className).length;
@@ -100,19 +109,27 @@ export default function ClassesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p className="text-sm text-ink-soft">
-          {visibleClasses.length} classe{visibleClasses.length > 1 ? "s" : ""}
+          {scopedClasses.length} classe{scopedClasses.length > 1 ? "s" : ""}
         </p>
-        {!isTeacher && (
-          <button
-            onClick={() => { setEditing(null); setShowForm((v) => !v); }}
-            className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
-          >
-            <IconPlus className="w-4 h-4" />
-            Nouvelle classe
-          </button>
-        )}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Rechercher une classe, un enseignant..."
+            className="sm:w-64"
+          />
+          {!isTeacher && (
+            <button
+              onClick={() => { setEditing(null); setShowForm((v) => !v); }}
+              className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
+            >
+              <IconPlus className="w-4 h-4" />
+              Nouvelle classe
+            </button>
+          )}
+        </div>
       </div>
 
       {!isTeacher && (showForm || editing) && (
@@ -133,11 +150,17 @@ export default function ClassesPage() {
         {!loading && visibleClasses.length === 0 ? (
           <EmptyState
             icon={IconLayers}
-            title={isTeacher ? "Aucune classe ne vous est encore attribuée" : "Aucune classe créée"}
+            title={
+              scopedClasses.length === 0
+                ? (isTeacher ? "Aucune classe ne vous est encore attribuée" : "Aucune classe créée")
+                : "Aucun résultat"
+            }
             text={
-              isTeacher
-                ? "Contactez la direction pour être affecté à une classe."
-                : "Créez vos classes (ex : CP, CM2, 6ème A) pour pouvoir y inscrire des élèves et affecter des enseignants."
+              scopedClasses.length === 0
+                ? (isTeacher
+                    ? "Contactez la direction pour être affecté à une classe."
+                    : "Créez vos classes (ex : CP, CM2, 6ème A) pour pouvoir y inscrire des élèves et affecter des enseignants.")
+                : "Aucune classe ne correspond à cette recherche."
             }
           />
         ) : (

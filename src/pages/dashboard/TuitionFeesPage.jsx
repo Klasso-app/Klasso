@@ -16,6 +16,7 @@ import { useAuth } from "../../context/AuthContext";
 import { LEVELS, CLASS_NAMES_BY_LEVEL } from "../../lib/schoolLevels";
 import { IconPlus, IconWallet } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
+import SearchInput from "../../components/dashboard/SearchInput";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
 const TABS = ["Frais de scolarité", "Autres frais"];
@@ -167,6 +168,13 @@ function OtherFees() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [search, setSearch] = useState("");
+
+  const visibleFees = search.trim()
+    ? fees.filter((f) =>
+        [f.name, f.timing].some((v) => (v || "").toLowerCase().includes(search.trim().toLowerCase()))
+      )
+    : fees;
 
   useEffect(() => {
     if (!schoolId) return;
@@ -195,7 +203,13 @@ function OtherFees() {
         d'inscription, tenue scolaire, examen blanc, carte d'identité scolaire, etc.
       </p>
 
-      <div className="flex items-center justify-end">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Rechercher un frais..."
+          className="sm:w-64"
+        />
         <button
           onClick={() => { setEditing(null); setShowForm((v) => !v); }}
           className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
@@ -210,11 +224,11 @@ function OtherFees() {
       )}
 
       <div className="rounded-xl border border-line bg-surface">
-        {!loading && fees.length === 0 ? (
+        {!loading && visibleFees.length === 0 ? (
           <EmptyState
             icon={IconWallet}
-            title="Aucun autre frais défini"
-            text="Ajoutez les frais ponctuels ou annexes que vos élèves doivent régler."
+            title={fees.length === 0 ? "Aucun autre frais défini" : "Aucun résultat"}
+            text={fees.length === 0 ? "Ajoutez les frais ponctuels ou annexes que vos élèves doivent régler." : "Aucun frais ne correspond à cette recherche."}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -228,7 +242,7 @@ function OtherFees() {
                 </tr>
               </thead>
               <tbody>
-                {fees.map((f) => (
+                {visibleFees.map((f) => (
                   <tr key={f.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{f.name}</td>
                     <td className="px-6 py-3 text-ink-soft">

@@ -13,6 +13,7 @@ import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { IconMessage } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
+import SearchInput from "../../components/dashboard/SearchInput";
 
 const STAFF_ROLES = ["directeur", "secretaire", "enseignant"];
 
@@ -93,6 +94,13 @@ function StaffInbox() {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const visibleConversations = search.trim()
+    ? conversations.filter((c) =>
+        [c.parentName, c.lastMessage].some((v) => (v || "").toLowerCase().includes(search.trim().toLowerCase()))
+      )
+    : conversations;
 
   useEffect(() => {
     if (!schoolId) return;
@@ -153,8 +161,14 @@ function StaffInbox() {
 
   return (
     <div className="rounded-xl border border-line bg-surface flex flex-col sm:flex-row h-[65vh] overflow-hidden">
-      <div className="sm:w-64 shrink-0 border-b sm:border-b-0 sm:border-r border-line overflow-y-auto">
-        {conversations.map((c) => (
+      <div className="sm:w-64 shrink-0 border-b sm:border-b-0 sm:border-r border-line overflow-y-auto flex flex-col">
+        <div className="p-2 border-b border-line">
+          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher un parent..." />
+        </div>
+        {visibleConversations.length === 0 && (
+          <p className="text-sm text-ink-soft text-center mt-6 px-4">Aucun résultat.</p>
+        )}
+        {visibleConversations.map((c) => (
           <button
             key={c.id}
             onClick={() => setSelectedId(c.id)}

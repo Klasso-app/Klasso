@@ -4,6 +4,7 @@ import { createStaffAccount, fetchSchoolStaff, revokeStaffAccess } from "../../l
 import { LEVELS } from "../../lib/schoolLevels";
 import { IconPlus, IconShield, IconUserCircle } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
+import SearchInput from "../../components/dashboard/SearchInput";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
 const ROLES = [
@@ -22,6 +23,13 @@ export default function AdminPage() {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const visibleStaff = search.trim()
+    ? staff.filter((m) =>
+        [m.name, m.email, roleLabel(m.role), m.level].some((v) => (v || "").toLowerCase().includes(search.trim().toLowerCase()))
+      )
+    : staff;
 
   async function loadStaff() {
     setLoading(true);
@@ -68,7 +76,13 @@ export default function AdminPage() {
         enseignants se créent depuis le module Enseignants.
       </p>
 
-      <div className="flex items-center justify-end">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Rechercher un membre du personnel..."
+          className="sm:w-64"
+        />
         <button
           onClick={() => setShowForm((v) => !v)}
           className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
@@ -86,11 +100,11 @@ export default function AdminPage() {
       )}
 
       <div className="rounded-xl border border-line bg-surface">
-        {!loading && staff.length === 0 ? (
+        {!loading && visibleStaff.length === 0 ? (
           <EmptyState
             icon={IconUserCircle}
-            title="Aucun membre du personnel administratif"
-            text="Utilisez le bouton « Nouveau compte » pour ajouter une secrétaire ou un autre directeur."
+            title={staff.length === 0 ? "Aucun membre du personnel administratif" : "Aucun résultat"}
+            text={staff.length === 0 ? "Utilisez le bouton « Nouveau compte » pour ajouter une secrétaire ou un autre directeur." : "Aucun membre ne correspond à cette recherche."}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -105,7 +119,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {staff.map((m) => (
+                {visibleStaff.map((m) => (
                   <tr key={m.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">
                       {m.name}

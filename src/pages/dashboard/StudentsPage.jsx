@@ -20,6 +20,7 @@ import { logAction } from "../../lib/auditLog";
 import { getAccessibleClasses } from "../../lib/scope";
 import { IconPlus, IconUsers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
+import SearchInput from "../../components/dashboard/SearchInput";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
 const FILTERS = ["Actifs", "Anciens / transférés", "Tous"];
@@ -45,6 +46,7 @@ export default function StudentsPage() {
   const [editing, setEditing] = useState(null);
   const [reenrolling, setReenrolling] = useState(null);
   const [filter, setFilter] = useState(FILTERS[0]);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (!schoolId) return;
@@ -91,11 +93,20 @@ export default function StudentsPage() {
     return students.filter((s) => accessibleClassNames.has(s.classLabel));
   }, [students, profile, accessibleClassNames]);
 
-  const visibleStudents = useMemo(() => {
+  const filteredStudents = useMemo(() => {
     if (filter === "Tous") return scopedStudents;
     if (filter === "Actifs") return scopedStudents.filter((s) => (s.status || "Actif") === "Actif");
     return scopedStudents.filter((s) => (s.status || "Actif") !== "Actif");
   }, [scopedStudents, filter]);
+
+  const visibleStudents = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return filteredStudents;
+    return filteredStudents.filter((s) =>
+      [s.fullName, s.matricule, s.classLabel, s.guardianName, s.guardianPhone]
+        .some((v) => (v || "").toLowerCase().includes(term))
+    );
+  }, [filteredStudents, search]);
 
   async function handleDelete(student) {
     if (!window.confirm(`Supprimer définitivement le dossier de ${student.fullName} ?`)) return;
@@ -130,7 +141,7 @@ export default function StudentsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col gap-3">
         <div className="flex items-center gap-1 rounded-lg border border-line p-1 w-fit">
           {FILTERS.map((f) => (
             <button
@@ -142,6 +153,13 @@ export default function StudentsPage() {
             </button>
           ))}
         </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Rechercher un élève, un matricule, une classe..."
+          className="sm:w-64"
+        />
         <div className="flex items-center gap-2">
           <button
             onClick={() => exportToCsv("eleves-klasso", visibleStudents.map((s) => ({
@@ -165,6 +183,7 @@ export default function StudentsPage() {
             <IconPlus className="w-4 h-4" />
             Nouvel élève
           </button>
+        </div>
         </div>
       </div>
 

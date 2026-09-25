@@ -15,6 +15,7 @@ import { useAuth } from "../../context/AuthContext";
 import { seedDefaultSubjects } from "../../lib/subjects";
 import { IconPlus, IconChart } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
+import SearchInput from "../../components/dashboard/SearchInput";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
 const CYCLES = ["Collège", "Lycée", "Les deux"];
@@ -28,6 +29,13 @@ export default function SubjectsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [seeding, setSeeding] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const visibleSubjects = search.trim()
+    ? subjects.filter((s) =>
+        [s.name, s.cycle].some((v) => (v || "").toLowerCase().includes(search.trim().toLowerCase()))
+      )
+    : subjects;
 
   useEffect(() => {
     if (!schoolId) return;
@@ -64,7 +72,13 @@ export default function SubjectsPage() {
         <p className="text-sm text-ink-soft">
           {subjects.length} matière{subjects.length > 1 ? "s" : ""}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Rechercher une matière..."
+            className="sm:w-64"
+          />
           {subjects.length === 0 && (
             <button
               onClick={handleSeed}
@@ -89,11 +103,15 @@ export default function SubjectsPage() {
       )}
 
       <div className="rounded-xl border border-line bg-surface">
-        {!loading && subjects.length === 0 ? (
+        {!loading && visibleSubjects.length === 0 ? (
           <EmptyState
             icon={IconChart}
-            title="Aucune matière enregistrée"
-            text="Chargez la liste type des matières enseignées au Bénin, puis ajustez-la selon votre établissement, ou ajoutez vos matières une par une."
+            title={subjects.length === 0 ? "Aucune matière enregistrée" : "Aucun résultat"}
+            text={
+              subjects.length === 0
+                ? "Chargez la liste type des matières enseignées au Bénin, puis ajustez-la selon votre établissement, ou ajoutez vos matières une par une."
+                : "Aucune matière ne correspond à cette recherche."
+            }
           />
         ) : (
           <div className="overflow-x-auto">
@@ -106,7 +124,7 @@ export default function SubjectsPage() {
                 </tr>
               </thead>
               <tbody>
-                {subjects.map((s) => (
+                {visibleSubjects.map((s) => (
                   <tr key={s.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{s.name}</td>
                     <td className="px-6 py-3 text-ink-soft">{s.cycle || "—"}</td>

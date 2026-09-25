@@ -13,6 +13,7 @@ import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { IconPlus, IconMessage } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
+import SearchInput from "../../components/dashboard/SearchInput";
 import FormField, { TextInput } from "../../components/auth/FormField";
 
 const CAN_POST = ["directeur", "secretaire"];
@@ -25,6 +26,13 @@ export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const visibleAnnouncements = search.trim()
+    ? announcements.filter((a) =>
+        [a.title, a.body, a.authorName].some((v) => (v || "").toLowerCase().includes(search.trim().toLowerCase()))
+      )
+    : announcements;
 
   useEffect(() => {
     if (!schoolId) return;
@@ -43,8 +51,14 @@ export default function AnnouncementsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {canPost && (
-        <div className="flex items-center justify-end">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Rechercher une annonce..."
+          className="sm:w-64"
+        />
+        {canPost && (
           <button
             onClick={() => setShowForm((v) => !v)}
             className="flex items-center gap-1.5 text-sm bg-indigo-500 text-white rounded-lg px-4 py-2"
@@ -52,24 +66,24 @@ export default function AnnouncementsPage() {
             <IconPlus className="w-4 h-4" />
             Nouvelle annonce
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {showForm && (
         <NewAnnouncementForm schoolId={schoolId} authorName={profile?.name} onDone={() => setShowForm(false)} />
       )}
 
-      {!loading && announcements.length === 0 ? (
+      {!loading && visibleAnnouncements.length === 0 ? (
         <div className="rounded-xl border border-line bg-surface">
           <EmptyState
             icon={IconMessage}
-            title="Aucune annonce pour le moment"
-            text="Les informations importantes de l'établissement apparaîtront ici."
+            title={announcements.length === 0 ? "Aucune annonce pour le moment" : "Aucun résultat"}
+            text={announcements.length === 0 ? "Les informations importantes de l'établissement apparaîtront ici." : "Aucune annonce ne correspond à cette recherche."}
           />
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {announcements.map((a) => (
+          {visibleAnnouncements.map((a) => (
             <div key={a.id} className="rounded-xl border border-line bg-surface p-6">
               <div className="flex items-start justify-between gap-4">
                 <h2 className="font-display text-base text-ink">{a.title}</h2>
