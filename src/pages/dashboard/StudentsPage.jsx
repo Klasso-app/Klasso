@@ -23,7 +23,7 @@ import EmptyState from "../../components/dashboard/EmptyState";
 import SearchInput from "../../components/dashboard/SearchInput";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
-const FILTERS = ["Actifs", "Anciens / transférés", "Tous"];
+const FILTERS = ["Actifs", "Non réinscrits", "Anciens / transférés", "Tous"];
 
 const DEFAULT_DOCUMENTS = [
   "Acte de naissance",
@@ -93,11 +93,27 @@ export default function StudentsPage() {
     return students.filter((s) => accessibleClassNames.has(s.classLabel));
   }, [students, profile, accessibleClassNames]);
 
+  const schoolYear = currentSchoolYear();
+
+  // Un élève actif dont l'année scolaire enregistrée n'est pas l'année en
+  // cours n'a pas encore été réinscrit (ni via « Réinscrire » sur cette
+  // page, ni via un passage de classe) — il reste rattaché à l'année
+  // précédente jusqu'à ce que l'un de ces deux gestes le fasse basculer.
+  function isPendingReenrollment(s) {
+    return (s.status || "Actif") === "Actif" && (s.schoolYear || "") !== schoolYear;
+  }
+
+  const pendingReenrollment = useMemo(
+    () => scopedStudents.filter(isPendingReenrollment),
+    [scopedStudents, schoolYear]
+  );
+
   const filteredStudents = useMemo(() => {
     if (filter === "Tous") return scopedStudents;
     if (filter === "Actifs") return scopedStudents.filter((s) => (s.status || "Actif") === "Actif");
+    if (filter === "Non réinscrits") return scopedStudents.filter(isPendingReenrollment);
     return scopedStudents.filter((s) => (s.status || "Actif") !== "Actif");
-  }, [scopedStudents, filter]);
+  }, [scopedStudents, filter, schoolYear]);
 
   const visibleStudents = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -142,14 +158,32 @@ export default function StudentsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-1 rounded-lg border border-line p-1 w-fit">
+        {pendingReenrollment.length > 0 && filter !== "Non réinscrits" && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3">
+            <p className="text-sm text-ink">
+              <span className="font-medium">{pendingReenrollment.length}</span> élève{pendingReenrollment.length > 1 ? "s" : ""} actif{pendingReenrollment.length > 1 ? "s" : ""} pas encore réinscrit{pendingReenrollment.length > 1 ? "s" : ""} pour {schoolYear}.
+            </p>
+            <button
+              onClick={() => { setFilter("Non réinscrits"); setSearch(""); }}
+              className="text-xs text-indigo-600 shrink-0 text-left sm:text-right"
+            >
+              Voir la liste
+            </button>
+          </div>
+        )}
+        <div className="flex items-center gap-1 rounded-lg border border-line p-1 w-fit overflow-x-auto">
           {FILTERS.map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`text-xs px-3 py-1.5 rounded-md ${filter === f ? "bg-indigo-50 text-indigo-600 font-medium" : "text-ink-soft"}`}
+              className={`text-xs px-3 py-1.5 rounded-md whitespace-nowrap ${filter === f ? "bg-indigo-50 text-indigo-600 font-medium" : "text-ink-soft"}`}
             >
               {f}
+              {f === "Non réinscrits" && pendingReenrollment.length > 0 && (
+                <span className="ml-1.5 text-[10px] bg-warning text-white rounded-full px-1.5 py-0.5">
+                  {pendingReenrollment.length}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -205,8 +239,16 @@ export default function StudentsPage() {
         {!loading && visibleStudents.length === 0 ? (
           <EmptyState
             icon={IconUsers}
-            title="Aucun élève dans cette liste"
-            text="Utilisez le bouton « Nouvel élève » pour commencer les inscriptions de votre établissement."
+            title={
+              filter === "Non réinscrits" && !search.trim()
+                ? "Tous les élèves actifs sont réinscrits"
+                : "Aucun élève dans cette liste"
+            }
+            text={
+              filter === "Non réinscrits" && !search.trim()
+                ? `Aucun élève actif n'est encore rattaché à une année antérieure à ${schoolYear}.`
+                : "Utilisez le bouton « Nouvel élève » pour commencer les inscriptions de votre établissement."
+            }
           />
         ) : (
           <div className="overflow-x-auto">
@@ -225,12 +267,21 @@ export default function StudentsPage() {
               <tbody>
                 {visibleStudents.map((s) => {
                   const status = s.status || "Actif";
+                  const pending = isPendingReenrollment(s);
                   return (
                     <tr key={s.id} className="border-t border-line">
                       <td className="px-6 py-3 text-ink-soft font-mono text-xs">{s.matricule || "—"}</td>
                       <td className="px-6 py-3 text-ink">{s.fullName}</td>
                       <td className="px-6 py-3 text-ink-soft">{s.classLabel || "—"}</td>
-                      <td className="px-6 py-3 text-ink-soft">{s.schoolYear || "—"}</td>
+                      <td className="px-6 py-3">
+                        {pending ? (
+                          <span className="text-xs px-2 py-0.5 rounded-md text-warning bg-warning-soft">
+                            {s.schoolYear || "—"} · à réinscrire
+                          </span>
+                        ) : (
+                          <span className="text-ink-soft">{s.schoolYear || "—"}</span>
+                        )}
+                      </td>
                       <td className="px-6 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-md ${status === "Actif" ? "text-success bg-success-soft" : "text-ink-soft bg-surface-tint"}`}>
                           {status}
