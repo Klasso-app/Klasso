@@ -12,3 +12,18 @@ export function nextSchoolYear(date = new Date()) {
   const [start] = currentSchoolYear(date).split("-").map(Number);
   return `${start + 1}-${start + 2}`;
 }
+
+// Année cible pour réinscrire (ou faire passer) un élève dont l'année
+// scolaire enregistrée est `previousSchoolYear`.
+// - Si l'élève est déjà sur l'année en cours (ou n'a pas d'année connue),
+//   on le prépare pour l'année suivante (cas : réinscription anticipée en
+//   juin/juillet, avant la rentrée).
+// - Sinon, il est en retard sur une année passée : on le ramène directement
+//   sur l'année en cours (cas : rattrapage après la rentrée), plutôt que de
+//   toujours viser « l'année après aujourd'hui », ce qui le ferait sauter
+//   une année scolaire entière s'il est réinscrit après le 1er août.
+export function reenrollmentTargetYear(previousSchoolYear, date = new Date()) {
+  const current = currentSchoolYear(date);
+  if (!previousSchoolYear || previousSchoolYear === current) return nextSchoolYear(date);
+  return current;
+}

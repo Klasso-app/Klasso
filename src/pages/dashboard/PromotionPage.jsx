@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { logAction } from "../../lib/auditLog";
 import { getAccessibleClasses } from "../../lib/scope";
 import { nextClassName } from "../../lib/schoolLevels";
-import { nextSchoolYear, currentSchoolYear } from "../../lib/schoolYear";
+import { currentSchoolYear, reenrollmentTargetYear } from "../../lib/schoolYear";
 import { fetchAllGrades, averageForStudent } from "../../lib/grades";
 import { IconLayers, IconShield } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
@@ -79,7 +79,11 @@ export default function PromotionPage() {
 
   const suggestedNext = selectedClass ? nextClassName(selectedClass.name) : null;
   const isTerminale = selectedClass?.name === "Terminale";
-  const targetYear = nextSchoolYear();
+  // Valeur affichée dans la confirmation : représentative de la classe (basée
+  // sur le premier élève), mais chaque élève reçoit sa propre année cible au
+  // moment de la validation (voir handleValidate), au cas où certains
+  // auraient déjà été traités individuellement via « Réinscrire ».
+  const targetYear = reenrollmentTargetYear(classStudents[0]?.schoolYear);
 
   function decisionOptionsFor(currentClassName) {
     const opts = [];
@@ -125,7 +129,7 @@ export default function PromotionPage() {
           else promoted++;
           const payload = {
             classLabel: decision,
-            schoolYear: targetYear,
+            schoolYear: reenrollmentTargetYear(s.schoolYear),
             status: "Actif",
           };
           if (tuitionFees[decision] !== undefined) payload.annualFees = tuitionFees[decision];

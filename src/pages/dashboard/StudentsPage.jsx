@@ -15,7 +15,7 @@ import { useAuth } from "../../context/AuthContext";
 import { createParentInvitation } from "../../lib/invitations";
 import { generateMatricule } from "../../lib/students";
 import { exportToCsv } from "../../lib/csv";
-import { currentSchoolYear, nextSchoolYear } from "../../lib/schoolYear";
+import { currentSchoolYear, reenrollmentTargetYear } from "../../lib/schoolYear";
 import { logAction } from "../../lib/auditLog";
 import { getAccessibleClasses } from "../../lib/scope";
 import { IconPlus, IconUsers } from "../../components/icons";
@@ -364,7 +364,7 @@ function ParentCodeCell({ schoolId, student }) {
 function ReenrollForm({ schoolId, classes, tuitionFees, student, onDone }) {
   const [classLabel, setClassLabel] = useState(student.classLabel || "");
   const [submitting, setSubmitting] = useState(false);
-  const targetYear = nextSchoolYear();
+  const targetYear = reenrollmentTargetYear(student.schoolYear);
   const suggestedFee = tuitionFees[classLabel];
 
   async function handleSubmit(e) {
