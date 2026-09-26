@@ -99,10 +99,15 @@ function TeacherRecords({ schoolId, teachers, subjects, classes, loading }) {
   const [transferring, setTransferring] = useState(null);
   const [search, setSearch] = useState("");
 
-  // Un enseignant de maternelle/primaire a la charge d'une seule classe à
-  // la fois (headTeacherId sur la classe) — au secondaire, l'affectation se
-  // fait matière par matière (classSubjectTeachers), donc pas de "classe
-  // actuelle" unique à afficher ici.
+  // headTeacherId sur la classe porte deux sens selon le niveau :
+  //  - en maternelle/primaire, c'est l'unique enseignant en charge de toute
+  //    la classe (obligatoire à la création) ;
+  //  - au secondaire, c'est le « professeur principal », facultatif et
+  //    indépendant des affectations matière par matière
+  //    (classSubjectTeachers) — il peut très bien ne pas encore être désigné,
+  //    et être choisi plus tard, une fois l'enseignant disponible.
+  // Dans les deux cas, un même enseignant n'a jamais qu'une seule classe à
+  // ce titre.
   function currentClassFor(teacher) {
     return classes.find((c) => c.headTeacherId === teacher.id);
   }
@@ -179,7 +184,7 @@ function TeacherRecords({ schoolId, teachers, subjects, classes, loading }) {
                 <tr className="text-left text-xs text-ink-soft">
                   <th className="px-6 py-3 font-medium">Nom</th>
                   <th className="px-6 py-3 font-medium">Niveau</th>
-                  <th className="px-6 py-3 font-medium">Classe</th>
+                  <th className="px-6 py-3 font-medium">Classe / Professeur principal</th>
                   <th className="px-6 py-3 font-medium">Matière(s)</th>
                   <th className="px-6 py-3 font-medium">Contrat</th>
                   <th className="px-6 py-3 font-medium">Salaire mensuel</th>
@@ -189,14 +194,20 @@ function TeacherRecords({ schoolId, teachers, subjects, classes, loading }) {
               </thead>
               <tbody>
                 {visibleTeachers.map((t) => {
-                  const isClassLevel = t.level === "Maternelle" || t.level === "Primaire";
-                  const currentClass = isClassLevel ? currentClassFor(t) : null;
+                  const isSecondaire = t.level === "Secondaire";
+                  const canHaveClass = t.level === "Maternelle" || t.level === "Primaire" || isSecondaire;
+                  const currentClass = canHaveClass ? currentClassFor(t) : null;
+                  const transferLabel = currentClass
+                    ? "Transférer"
+                    : isSecondaire
+                    ? "Désigner professeur principal"
+                    : "Assigner une classe";
                   return (
                     <tr key={t.id} className="border-t border-line">
                       <td className="px-6 py-3 text-ink">{t.fullName}</td>
                       <td className="px-6 py-3 text-ink-soft">{t.level || "—"}</td>
                       <td className="px-6 py-3 text-ink-soft">
-                        {isClassLevel ? (currentClass?.name || "Aucune classe") : "—"}
+                        {!canHaveClass ? "—" : currentClass?.name || (isSecondaire ? "—" : "Aucune classe")}
                       </td>
                       <td className="px-6 py-3 text-ink-soft">{t.level === "Secondaire" ? formatSubjects(t.subjects) : "—"}</td>
                       <td className="px-6 py-3 text-ink-soft">{t.contractType || "—"}</td>
@@ -209,9 +220,9 @@ function TeacherRecords({ schoolId, teachers, subjects, classes, loading }) {
                           <button onClick={() => { setShowForm(false); setEditing(t); }} className="text-xs text-indigo-600">
                             Modifier
                           </button>
-                          {isClassLevel && (
+                          {canHaveClass && (
                             <button onClick={() => setTransferring(t)} className="text-xs text-indigo-600">
-                              Transférer
+                              {transferLabel}
                             </button>
                           )}
                           <button onClick={() => handleDelete(t)} className="text-xs text-danger">
@@ -233,6 +244,8 @@ function TeacherRecords({ schoolId, teachers, subjects, classes, loading }) {
 
 function TransferTeacherForm({ schoolId, teacher, currentClass, classes, onDone }) {
   const { profile, firebaseUser } = useAuth();
+  const isSecondaire = teacher.level === "Secondaire";
+  const isFirstAssignment = !currentClass;
   const options = classes.filter((c) => c.level === teacher.level && c.id !== currentClass?.id);
   const [targetClassId, setTargetClassId] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -274,13 +287,15 @@ function TransferTeacherForm({ schoolId, teacher, currentClass, classes, onDone 
       logAction(schoolId, {
         actorUid: firebaseUser?.uid,
         actorName: profile?.name,
-        action: "Transfert d'un enseignant",
+        action: isFirstAssignment
+          ? (isSecondaire ? "Désignation d'un professeur principal" : "Affectation d'un enseignant")
+          : "Transfert d'un enseignant",
         details: `${teacher.fullName} : ${currentClass?.name || "aucune classe"} → ${targetClass.name}`,
       });
 
       onDone();
     } catch (err) {
-      setError("Le transfert a échoué. Réessayez.");
+      setError("L'opération a échoué. Réessayez.");
     } finally {
       setSubmitting(false);
     }
@@ -288,12 +303,16 @@ function TransferTeacherForm({ schoolId, teacher, currentClass, classes, onDone 
 
   return (
     <form onSubmit={handleSubmit} className="rounded-xl border border-line bg-surface p-6 flex flex-col gap-4">
-      <h2 className="font-display text-base text-ink">Transférer {teacher.fullName}</h2>
+      <h2 className="font-display text-base text-ink">
+        {isFirstAssignment
+          ? (isSecondaire ? `Désigner ${teacher.fullName} comme professeur principal` : `Assigner une classe à ${teacher.fullName}`)
+          : `Transférer ${teacher.fullName}`}
+      </h2>
       <p className="text-sm text-ink-soft">
-        Classe actuelle : <span className="text-ink">{currentClass?.name || "aucune"}</span>
+        Classe actuelle : <span className="text-ink">{currentClass?.name || "aucune pour le moment"}</span>
       </p>
 
-      <FormField label="Nouvelle classe">
+      <FormField label={isSecondaire ? "Classe (en tant que professeur principal)" : "Nouvelle classe"}>
         <Select required value={targetClassId} onChange={(e) => setTargetClassId(e.target.value)}>
           <option value="">Sélectionner une classe</option>
           {options.map((c) => (
@@ -317,7 +336,7 @@ function TransferTeacherForm({ schoolId, teacher, currentClass, classes, onDone 
           disabled={submitting || !targetClassId}
           className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2 disabled:opacity-60"
         >
-          {submitting ? "Transfert..." : "Confirmer le transfert"}
+          {submitting ? "Enregistrement..." : isFirstAssignment ? "Confirmer l'affectation" : "Confirmer le transfert"}
         </button>
         <button type="button" onClick={onDone} className="text-sm text-ink-soft">
           Annuler

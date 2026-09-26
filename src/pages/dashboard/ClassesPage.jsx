@@ -180,7 +180,9 @@ export default function ClassesPage() {
                   <tr key={c.id} className="border-t border-line">
                     <td className="px-6 py-3 text-ink">{c.name}</td>
                     <td className="px-6 py-3 text-ink-soft">{c.level || "—"}</td>
-                    <td className="px-6 py-3 text-ink-soft">{c.headTeacherName || "—"}</td>
+                    <td className="px-6 py-3 text-ink-soft">
+                      {c.headTeacherName || (c.level === "Secondaire" ? "Pas encore désigné" : "—")}
+                    </td>
                     <td className="px-6 py-3 text-ink-soft">{studentCount(c.name)}</td>
                     {!isTeacher && (
                       <td className="px-6 py-3">
