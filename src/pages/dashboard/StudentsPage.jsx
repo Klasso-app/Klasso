@@ -15,7 +15,7 @@ import { useAuth } from "../../context/AuthContext";
 import { createParentInvitation } from "../../lib/invitations";
 import { generateMatricule } from "../../lib/students";
 import { exportToCsv } from "../../lib/csv";
-import { currentSchoolYear, reenrollmentTargetYear } from "../../lib/schoolYear";
+import { currentSchoolYear, nextSchoolYear, reenrollmentTargetYear } from "../../lib/schoolYear";
 import { logAction } from "../../lib/auditLog";
 import { getAccessibleClasses } from "../../lib/scope";
 import { IconPlus, IconUsers } from "../../components/icons";
@@ -94,18 +94,23 @@ export default function StudentsPage() {
   }, [students, profile, accessibleClassNames]);
 
   const schoolYear = currentSchoolYear();
+  const upcomingSchoolYear = nextSchoolYear();
 
-  // Un élève actif dont l'année scolaire enregistrée n'est pas l'année en
-  // cours n'a pas encore été réinscrit (ni via « Réinscrire » sur cette
-  // page, ni via un passage de classe) — il reste rattaché à l'année
-  // précédente jusqu'à ce que l'un de ces deux gestes le fasse basculer.
+  // Un élève actif dont l'année scolaire enregistrée n'est ni l'année en
+  // cours ni la suivante n'a pas encore été réinscrit (ni via « Réinscrire »
+  // sur cette page, ni via un passage de classe) — il reste rattaché à une
+  // année antérieure. On exclut volontairement l'année suivante : un élève
+  // déjà réinscrit en avance (avant la rentrée) ne doit pas être signalé
+  // comme en retard.
   function isPendingReenrollment(s) {
-    return (s.status || "Actif") === "Actif" && (s.schoolYear || "") !== schoolYear;
+    if ((s.status || "Actif") !== "Actif") return false;
+    const year = s.schoolYear || "";
+    return year !== schoolYear && year !== upcomingSchoolYear;
   }
 
   const pendingReenrollment = useMemo(
     () => scopedStudents.filter(isPendingReenrollment),
-    [scopedStudents, schoolYear]
+    [scopedStudents, schoolYear, upcomingSchoolYear]
   );
 
   const filteredStudents = useMemo(() => {
@@ -113,7 +118,7 @@ export default function StudentsPage() {
     if (filter === "Actifs") return scopedStudents.filter((s) => (s.status || "Actif") === "Actif");
     if (filter === "Non réinscrits") return scopedStudents.filter(isPendingReenrollment);
     return scopedStudents.filter((s) => (s.status || "Actif") !== "Actif");
-  }, [scopedStudents, filter, schoolYear]);
+  }, [scopedStudents, filter, schoolYear, upcomingSchoolYear]);
 
   const visibleStudents = useMemo(() => {
     const term = search.trim().toLowerCase();
