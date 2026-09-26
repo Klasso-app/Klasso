@@ -168,6 +168,17 @@ export function IconBell(props) {
   );
 }
 
+export function IconMegaphone(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 12 15 5v14L4 12Z" />
+      <path d="M5 13.5v3" />
+      <path d="M17.5 8c1.5 2.2 1.5 5.8 0 8" />
+      <path d="M20 6c2.2 3 2.2 9 0 12" />
+    </svg>
+  );
+}
+
 export function IconSearch(props) {
   return (
     <svg {...base} {...props}>

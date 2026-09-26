@@ -12,7 +12,7 @@ import {
 import { db } from "../../lib/firebase";
 import { uploadImageToCloudinary } from "../../lib/cloudinary";
 import { useAuth } from "../../context/AuthContext";
-import { IconPlus, IconBell, IconFile } from "../../components/icons";
+import { IconPlus, IconMegaphone, IconFile } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import SearchInput from "../../components/dashboard/SearchInput";
 import FormField, { TextInput } from "../../components/auth/FormField";
@@ -77,7 +77,7 @@ export default function AnnouncementsPage() {
       {!loading && visibleAnnouncements.length === 0 ? (
         <div className="rounded-xl border border-line bg-surface">
           <EmptyState
-            icon={IconBell}
+            icon={IconMegaphone}
             title={announcements.length === 0 ? "Aucune annonce pour le moment" : "Aucun résultat"}
             text={announcements.length === 0 ? "Les informations importantes de l'établissement apparaîtront ici." : "Aucune annonce ne correspond à cette recherche."}
           />
