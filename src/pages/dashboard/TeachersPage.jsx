@@ -9,6 +9,7 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
@@ -34,6 +35,7 @@ export default function TeachersPage() {
   const [tab, setTab] = useState(TABS[0]);
   const [allTeachers, setAllTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,9 +49,14 @@ export default function TeachersPage() {
       query(collection(db, "schools", schoolId, "subjects"), orderBy("name", "asc")),
       (snap) => setSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubClasses = onSnapshot(
+      collection(db, "schools", schoolId, "classes"),
+      (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
     return () => {
       unsub();
       unsubSubjects();
+      unsubClasses();
     };
   }, [schoolId]);
 
@@ -75,7 +82,7 @@ export default function TeachersPage() {
         ))}
       </div>
 
-      {tab === "Fiches" && <TeacherRecords schoolId={schoolId} teachers={teachers} subjects={subjects} loading={loading} />}
+      {tab === "Fiches" && <TeacherRecords schoolId={schoolId} teachers={teachers} subjects={subjects} classes={classes} loading={loading} />}
       {tab === "Pointage" && <TeacherAttendance schoolId={schoolId} teachers={teachers} />}
       {tab === "Évaluations" && <TeacherEvaluations schoolId={schoolId} teachers={teachers} />}
       {tab === "Congés" && <TeacherLeaves schoolId={schoolId} teachers={teachers} />}
@@ -85,11 +92,20 @@ export default function TeachersPage() {
 
 /* ---------- Fiches ---------- */
 
-function TeacherRecords({ schoolId, teachers, subjects, loading }) {
+function TeacherRecords({ schoolId, teachers, subjects, classes, loading }) {
   const { profile, firebaseUser } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [transferring, setTransferring] = useState(null);
   const [search, setSearch] = useState("");
+
+  // Un enseignant de maternelle/primaire a la charge d'une seule classe à
+  // la fois (headTeacherId sur la classe) — au secondaire, l'affectation se
+  // fait matière par matière (classSubjectTeachers), donc pas de "classe
+  // actuelle" unique à afficher ici.
+  function currentClassFor(teacher) {
+    return classes.find((c) => c.headTeacherId === teacher.id);
+  }
 
   const visibleTeachers = search.trim()
     ? teachers.filter((t) =>
@@ -139,6 +155,16 @@ function TeacherRecords({ schoolId, teachers, subjects, loading }) {
         <TeacherForm schoolId={schoolId} subjects={subjects} editing={editing} onDone={closeForm} />
       )}
 
+      {transferring && (
+        <TransferTeacherForm
+          schoolId={schoolId}
+          teacher={transferring}
+          currentClass={currentClassFor(transferring)}
+          classes={classes}
+          onDone={() => setTransferring(null)}
+        />
+      )}
+
       <div className="rounded-xl border border-line bg-surface">
         {!loading && visibleTeachers.length === 0 ? (
           <EmptyState
@@ -153,6 +179,7 @@ function TeacherRecords({ schoolId, teachers, subjects, loading }) {
                 <tr className="text-left text-xs text-ink-soft">
                   <th className="px-6 py-3 font-medium">Nom</th>
                   <th className="px-6 py-3 font-medium">Niveau</th>
+                  <th className="px-6 py-3 font-medium">Classe</th>
                   <th className="px-6 py-3 font-medium">Matière(s)</th>
                   <th className="px-6 py-3 font-medium">Contrat</th>
                   <th className="px-6 py-3 font-medium">Salaire mensuel</th>
@@ -161,34 +188,142 @@ function TeacherRecords({ schoolId, teachers, subjects, loading }) {
                 </tr>
               </thead>
               <tbody>
-                {visibleTeachers.map((t) => (
-                  <tr key={t.id} className="border-t border-line">
-                    <td className="px-6 py-3 text-ink">{t.fullName}</td>
-                    <td className="px-6 py-3 text-ink-soft">{t.level || "—"}</td>
-                    <td className="px-6 py-3 text-ink-soft">{t.level === "Secondaire" ? formatSubjects(t.subjects) : "—"}</td>
-                    <td className="px-6 py-3 text-ink-soft">{t.contractType || "—"}</td>
-                    <td className="px-6 py-3 text-ink-soft">
-                      {t.monthlySalary ? `${new Intl.NumberFormat("fr-FR").format(t.monthlySalary)} FCFA` : "—"}
-                    </td>
-                    <td className="px-6 py-3 text-ink-soft">{t.phone || "—"}</td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => { setShowForm(false); setEditing(t); }} className="text-xs text-indigo-600">
-                          Modifier
-                        </button>
-                        <button onClick={() => handleDelete(t)} className="text-xs text-danger">
-                          Supprimer
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {visibleTeachers.map((t) => {
+                  const isClassLevel = t.level === "Maternelle" || t.level === "Primaire";
+                  const currentClass = isClassLevel ? currentClassFor(t) : null;
+                  return (
+                    <tr key={t.id} className="border-t border-line">
+                      <td className="px-6 py-3 text-ink">{t.fullName}</td>
+                      <td className="px-6 py-3 text-ink-soft">{t.level || "—"}</td>
+                      <td className="px-6 py-3 text-ink-soft">
+                        {isClassLevel ? (currentClass?.name || "Aucune classe") : "—"}
+                      </td>
+                      <td className="px-6 py-3 text-ink-soft">{t.level === "Secondaire" ? formatSubjects(t.subjects) : "—"}</td>
+                      <td className="px-6 py-3 text-ink-soft">{t.contractType || "—"}</td>
+                      <td className="px-6 py-3 text-ink-soft">
+                        {t.monthlySalary ? `${new Intl.NumberFormat("fr-FR").format(t.monthlySalary)} FCFA` : "—"}
+                      </td>
+                      <td className="px-6 py-3 text-ink-soft">{t.phone || "—"}</td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <button onClick={() => { setShowForm(false); setEditing(t); }} className="text-xs text-indigo-600">
+                            Modifier
+                          </button>
+                          {isClassLevel && (
+                            <button onClick={() => setTransferring(t)} className="text-xs text-indigo-600">
+                              Transférer
+                            </button>
+                          )}
+                          <button onClick={() => handleDelete(t)} className="text-xs text-danger">
+                            Supprimer
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+function TransferTeacherForm({ schoolId, teacher, currentClass, classes, onDone }) {
+  const { profile, firebaseUser } = useAuth();
+  const options = classes.filter((c) => c.level === teacher.level && c.id !== currentClass?.id);
+  const [targetClassId, setTargetClassId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const targetClass = options.find((c) => c.id === targetClassId);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!targetClass) return;
+
+    if (targetClass.headTeacherId && targetClass.headTeacherId !== teacher.id) {
+      const confirmed = window.confirm(
+        `${targetClass.name} a déjà ${targetClass.headTeacherName} en charge. La transférer à ${teacher.fullName} retirera ${targetClass.headTeacherName} de cette classe. Continuer ?`
+      );
+      if (!confirmed) return;
+    }
+
+    setSubmitting(true);
+    setError("");
+    try {
+      const batch = writeBatch(db);
+      // Libère l'ancienne classe (si l'enseignant en avait une) pour ne
+      // jamais laisser une classe avec un headTeacherId pointant vers un
+      // enseignant qui n'y est plus, ni un enseignant affiché sur deux
+      // classes à la fois.
+      if (currentClass) {
+        batch.update(doc(db, "schools", schoolId, "classes", currentClass.id), {
+          headTeacherId: null,
+          headTeacherName: "",
+        });
+      }
+      batch.update(doc(db, "schools", schoolId, "classes", targetClass.id), {
+        headTeacherId: teacher.id,
+        headTeacherName: teacher.fullName,
+      });
+      await batch.commit();
+
+      logAction(schoolId, {
+        actorUid: firebaseUser?.uid,
+        actorName: profile?.name,
+        action: "Transfert d'un enseignant",
+        details: `${teacher.fullName} : ${currentClass?.name || "aucune classe"} → ${targetClass.name}`,
+      });
+
+      onDone();
+    } catch (err) {
+      setError("Le transfert a échoué. Réessayez.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-xl border border-line bg-surface p-6 flex flex-col gap-4">
+      <h2 className="font-display text-base text-ink">Transférer {teacher.fullName}</h2>
+      <p className="text-sm text-ink-soft">
+        Classe actuelle : <span className="text-ink">{currentClass?.name || "aucune"}</span>
+      </p>
+
+      <FormField label="Nouvelle classe">
+        <Select required value={targetClassId} onChange={(e) => setTargetClassId(e.target.value)}>
+          <option value="">Sélectionner une classe</option>
+          {options.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}{c.headTeacherId ? ` (actuellement : ${c.headTeacherName})` : ""}
+            </option>
+          ))}
+        </Select>
+        {options.length === 0 && (
+          <p className="text-xs text-ink-soft mt-1">
+            Aucune autre classe de niveau {teacher.level} n'est disponible.
+          </p>
+        )}
+      </FormField>
+
+      {error && <p className="text-sm text-danger">{error}</p>}
+
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={submitting || !targetClassId}
+          className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2 disabled:opacity-60"
+        >
+          {submitting ? "Transfert..." : "Confirmer le transfert"}
+        </button>
+        <button type="button" onClick={onDone} className="text-sm text-ink-soft">
+          Annuler
+        </button>
+      </div>
+    </form>
   );
 }
 
