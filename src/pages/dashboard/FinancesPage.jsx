@@ -39,6 +39,8 @@ export default function FinancesPage() {
   const [paymentSearch, setPaymentSearch] = useState("");
   const [expenseSearch, setExpenseSearch] = useState("");
   const [yearFilter, setYearFilter] = useState(currentSchoolYear());
+  const [showReminders, setShowReminders] = useState(false);
+  const [remindedIds, setRemindedIds] = useState(() => new Set());
 
   useEffect(() => {
     if (!schoolId) return;
@@ -173,6 +175,13 @@ export default function FinancesPage() {
   const totalDue = balances.reduce((s, b) => s + b.due, 0);
   const totalUnpaid = balances.reduce((s, b) => s + b.remaining, 0);
 
+  const unpaidBalances = useMemo(
+    () => balances.filter((b) => b.remaining > 0).sort((a, b) => b.remaining - a.remaining),
+    [balances]
+  );
+  const unpaidWithPhone = unpaidBalances.filter((b) => b.student.guardianPhone);
+  const unpaidWithoutPhone = unpaidBalances.filter((b) => !b.student.guardianPhone);
+
   async function handleDeletePayment(p) {
     if (!window.confirm(`Supprimer ce paiement de ${p.studentName} ?`)) return;
     await deleteDoc(doc(db, "schools", schoolId, "payments", p.id));
@@ -208,20 +217,88 @@ export default function FinancesPage() {
       <div className="rounded-xl border border-line bg-surface">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-5">
           <h2 className="font-display text-base text-ink">Échéancier par élève</h2>
-          <button
-            onClick={() => exportToCsv("echeancier-klasso", balances.map((b) => ({
-              Matricule: b.student.matricule || "",
-              Élève: b.student.fullName,
-              Classe: b.student.classLabel || "",
-              "Frais dus (FCFA)": Math.round(b.due),
-              "Payé (FCFA)": b.paid,
-              "Solde restant (FCFA)": Math.round(b.remaining),
-            })))}
-            className="text-xs text-indigo-600 border border-indigo-200 rounded-md px-3 py-2 self-start"
-          >
-            Exporter en CSV
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {unpaidBalances.length > 0 && (
+              <button
+                onClick={() => setShowReminders((v) => !v)}
+                className="text-xs text-indigo-600 border border-indigo-200 rounded-md px-3 py-2 self-start"
+              >
+                {showReminders ? "Fermer les relances" : `Relancer les impayés (${unpaidBalances.length})`}
+              </button>
+            )}
+            <button
+              onClick={() => exportToCsv("echeancier-klasso", balances.map((b) => ({
+                Matricule: b.student.matricule || "",
+                Élève: b.student.fullName,
+                Classe: b.student.classLabel || "",
+                "Frais dus (FCFA)": Math.round(b.due),
+                "Payé (FCFA)": b.paid,
+                "Solde restant (FCFA)": Math.round(b.remaining),
+              })))}
+              className="text-xs text-indigo-600 border border-indigo-200 rounded-md px-3 py-2 self-start"
+            >
+              Exporter en CSV
+            </button>
+          </div>
         </div>
+
+        {showReminders && (
+          <div className="border-t border-line px-6 py-5 flex flex-col gap-4 bg-surface-tint">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-ink">
+                {remindedIds.size} / {unpaidWithPhone.length} relancé{remindedIds.size > 1 ? "s" : ""} sur WhatsApp
+              </p>
+              {remindedIds.size > 0 && (
+                <button onClick={() => setRemindedIds(new Set())} className="text-xs text-ink-soft">
+                  Réinitialiser
+                </button>
+              )}
+            </div>
+
+            {unpaidWithPhone.length === 0 ? (
+              <p className="text-sm text-ink-soft">Aucun élève en impayé n'a de numéro de tuteur renseigné.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {unpaidWithPhone.map(({ student, remaining }) => {
+                  const done = remindedIds.has(student.id);
+                  return (
+                    <div key={student.id} className="flex items-center justify-between gap-3 bg-surface rounded-lg border border-line px-4 py-2.5">
+                      <div>
+                        <p className="text-sm text-ink">{student.fullName}</p>
+                        <p className="text-xs text-ink-soft">{student.classLabel} · {formatAmount(remaining)}</p>
+                      </div>
+                      <a
+                        href={buildReminderLink(student, remaining)}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => setRemindedIds((prev) => new Set(prev).add(student.id))}
+                        className={`text-xs rounded-md px-3 py-1.5 shrink-0 ${done ? "text-success bg-success-soft" : "text-indigo-600 border border-indigo-200"}`}
+                      >
+                        {done ? "Relancé ✓" : "Relancer"}
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {unpaidWithoutPhone.length > 0 && (
+              <div>
+                <p className="text-xs text-ink-soft mb-2">
+                  {unpaidWithoutPhone.length} élève(s) en impayé sans numéro de tuteur renseigné (à relancer autrement) :
+                </p>
+                <p className="text-xs text-ink-soft">
+                  {unpaidWithoutPhone.map((b) => b.student.fullName).join(", ")}
+                </p>
+              </div>
+            )}
+
+            <p className="text-xs text-ink-soft">
+              Chaque relance s'ouvre dans WhatsApp l'une après l'autre — le suivi « relancé » ci-dessus n'est
+              gardé que le temps de cette session, il n'est pas enregistré.
+            </p>
+          </div>
+        )}
         {balances.length === 0 ? (
           <EmptyState icon={IconWallet} title="Aucun élève inscrit" text="Les soldes apparaîtront ici une fois des élèves inscrits." />
         ) : (
