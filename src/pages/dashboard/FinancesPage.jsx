@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
+import { currentSchoolYear } from "../../lib/schoolYear";
 import { downloadReceipt } from "../../lib/receipt";
 import { exportToCsv } from "../../lib/csv";
 import { getAccessibleClasses } from "../../lib/scope";
@@ -37,6 +38,7 @@ export default function FinancesPage() {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [paymentSearch, setPaymentSearch] = useState("");
   const [expenseSearch, setExpenseSearch] = useState("");
+  const [yearFilter, setYearFilter] = useState(currentSchoolYear());
 
   useEffect(() => {
     if (!schoolId) return;
@@ -92,9 +94,31 @@ export default function FinancesPage() {
   );
 
   const scopedStudentIds = useMemo(() => new Set(scopedStudents.map((s) => s.id)), [scopedStudents]);
+
+  // Les paiements/dépenses enregistrés avant l'ajout de ce filtre n'ont pas
+  // de schoolYear : on les rattache par défaut à l'année en cours, pour ne
+  // rien faire disparaître rétroactivement (même convention que pour les
+  // notes, voir lib/grades.js).
+  const availableYears = useMemo(() => {
+    const years = new Set([currentSchoolYear()]);
+    payments.forEach((p) => years.add(p.schoolYear || currentSchoolYear()));
+    expenses.forEach((e) => years.add(e.schoolYear || currentSchoolYear()));
+    return Array.from(years).sort().reverse();
+  }, [payments, expenses]);
+
+  const yearFilteredPayments = useMemo(() => {
+    if (yearFilter === "all") return payments;
+    return payments.filter((p) => (p.schoolYear || currentSchoolYear()) === yearFilter);
+  }, [payments, yearFilter]);
+
+  const yearFilteredExpenses = useMemo(() => {
+    if (yearFilter === "all") return expenses;
+    return expenses.filter((e) => (e.schoolYear || currentSchoolYear()) === yearFilter);
+  }, [expenses, yearFilter]);
+
   const scopedPayments = useMemo(
-    () => payments.filter((p) => scopedStudentIds.has(p.studentId)),
-    [payments, scopedStudentIds]
+    () => yearFilteredPayments.filter((p) => scopedStudentIds.has(p.studentId)),
+    [yearFilteredPayments, scopedStudentIds]
   );
 
   const visiblePayments = useMemo(() => {
@@ -107,19 +131,19 @@ export default function FinancesPage() {
 
   const visibleExpenses = useMemo(() => {
     const term = expenseSearch.trim().toLowerCase();
-    if (!term) return expenses;
-    return expenses.filter((e) =>
+    if (!term) return yearFilteredExpenses;
+    return yearFilteredExpenses.filter((e) =>
       [e.label, e.category].some((v) => (v || "").toLowerCase().includes(term))
     );
-  }, [expenses, expenseSearch]);
+  }, [yearFilteredExpenses, expenseSearch]);
 
   const totalIncome = useMemo(
     () => scopedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
     [scopedPayments]
   );
   const totalExpenses = useMemo(
-    () => expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
-    [expenses]
+    () => yearFilteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
+    [yearFilteredExpenses]
   );
 
   // Seuls les paiements de type "Scolarité" (ou sans type, pour les
@@ -129,12 +153,12 @@ export default function FinancesPage() {
   const balances = useMemo(() => {
     return activeScopedStudents.map((s) => {
       const due = (Number(s.annualFees) || 0) * (1 - (Number(s.discountPercent) || 0) / 100);
-      const paid = payments
+      const paid = yearFilteredPayments
         .filter((p) => p.studentId === s.id && (!p.feeType || p.feeType === "Scolarité"))
         .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
       return { student: s, due, paid, remaining: Math.max(due - paid, 0) };
     });
-  }, [scopedStudents, payments]);
+  }, [activeScopedStudents, yearFilteredPayments]);
 
   const otherFeesTotals = useMemo(() => {
     return otherFees.map((f) => {
@@ -144,7 +168,7 @@ export default function FinancesPage() {
       const payers = new Set(scopedPayments.filter((p) => p.feeType === f.name).map((p) => p.studentId)).size;
       return { fee: f, collected, payers };
     });
-  }, [otherFees, payments]);
+  }, [otherFees, scopedPayments]);
 
   const totalDue = balances.reduce((s, b) => s + b.due, 0);
   const totalUnpaid = balances.reduce((s, b) => s + b.remaining, 0);
@@ -161,6 +185,18 @@ export default function FinancesPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-ink-soft shrink-0">Année scolaire</label>
+        <div className="w-full sm:w-56">
+          <Select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+            {availableYears.map((y) => (
+              <option key={y} value={y}>{y}{y === currentSchoolYear() ? " (en cours)" : ""}</option>
+            ))}
+            <option value="all">Toutes les années</option>
+          </Select>
+        </div>
+      </div>
+
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={IconWallet} label="Total encaissé" value={formatAmount(totalIncome)} />
         <StatCard icon={IconWallet} label="Total dépenses" value={formatAmount(totalExpenses)} />
@@ -288,7 +324,7 @@ export default function FinancesPage() {
         {!loading && visiblePayments.length === 0 ? (
           <EmptyState
             icon={IconWallet}
-            title={scopedPayments.length === 0 ? "Aucun paiement enregistré" : "Aucun résultat"}
+            title={scopedPayments.length === 0 ? (yearFilter === "all" ? "Aucun paiement enregistré" : `Aucun paiement pour ${yearFilter}`) : "Aucun résultat"}
             text={scopedPayments.length === 0 ? "Enregistrez les frais de scolarité au fur et à mesure des paiements." : "Aucun paiement ne correspond à cette recherche."}
           />
         ) : (
@@ -362,8 +398,8 @@ export default function FinancesPage() {
         {visibleExpenses.length === 0 ? (
           <EmptyState
             icon={IconWallet}
-            title={expenses.length === 0 ? "Aucune dépense enregistrée" : "Aucun résultat"}
-            text={expenses.length === 0 ? "Suivez ici les sorties d'argent de l'établissement (salaires, fournitures, entretien...)." : "Aucune dépense ne correspond à cette recherche."}
+            title={yearFilteredExpenses.length === 0 ? (yearFilter === "all" ? "Aucune dépense enregistrée" : `Aucune dépense pour ${yearFilter}`) : "Aucun résultat"}
+            text={yearFilteredExpenses.length === 0 ? "Suivez ici les sorties d'argent de l'établissement (salaires, fournitures, entretien...)." : "Aucune dépense ne correspond à cette recherche."}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -436,6 +472,7 @@ function NewPaymentForm({ schoolId, students, otherFees, onDone }) {
         amount: Number(form.amount),
         method: form.method,
         date: form.date,
+        schoolYear: currentSchoolYear(new Date(form.date)),
         createdAt: serverTimestamp(),
       });
       setForm({ studentId: "", feeType: "Scolarité", amount: "", method: METHODS[0], date: new Date().toISOString().slice(0, 10) });
@@ -505,6 +542,7 @@ function NewExpenseForm({ schoolId, onDone }) {
       await addDoc(collection(db, "schools", schoolId, "expenses"), {
         ...form,
         amount: Number(form.amount),
+        schoolYear: currentSchoolYear(new Date(form.date)),
         createdAt: serverTimestamp(),
       });
       setForm({ label: "", category: EXPENSE_CATEGORIES[0], amount: "", date: new Date().toISOString().slice(0, 10) });
