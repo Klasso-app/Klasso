@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   collection,
   addDoc,
@@ -226,6 +226,19 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // On ne propose que les enseignants du même niveau que la classe, pour
+  // éviter d'affecter par erreur un enseignant du secondaire à la tête
+  // d'une classe de primaire (ou l'inverse). On garde toutefois
+  // l'enseignant déjà assigné dans la liste même s'il ne correspond plus,
+  // pour ne pas le faire disparaître silencieusement à l'ouverture du
+  // formulaire d'édition.
+  const levelTeachers = useMemo(() => {
+    const filtered = teachers.filter((t) => t.level === form.level);
+    const current = teachers.find((t) => t.id === form.headTeacherId);
+    if (current && !filtered.some((t) => t.id === current.id)) filtered.push(current);
+    return filtered;
+  }, [teachers, form.level, form.headTeacherId]);
+
   function update(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   }
@@ -266,7 +279,7 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
           <Select
             required
             value={form.level}
-            onChange={(e) => setForm((f) => ({ ...f, level: e.target.value, name: "" }))}
+            onChange={(e) => setForm((f) => ({ ...f, level: e.target.value, name: "", headTeacherId: "" }))}
           >
             <option value="">Sélectionner un niveau</option>
             {LEVELS.map((lvl) => <option key={lvl} value={lvl}>{lvl}</option>)}
@@ -302,7 +315,7 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
             <option value="">
               {form.level === "Secondaire" ? "Aucun pour le moment" : "Sélectionner un enseignant"}
             </option>
-            {teachers.map((t) => (
+            {levelTeachers.map((t) => (
               <option key={t.id} value={t.id}>{t.fullName}</option>
             ))}
           </Select>
@@ -315,6 +328,11 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
             <p className="text-xs text-ink-soft mt-1">
               Au secondaire, chaque matière a son propre enseignant : utilisez le bouton
               « Matières » sur la classe une fois créée pour les affecter.
+            </p>
+          )}
+          {form.level && levelTeachers.length === 0 && (
+            <p className="text-xs text-warning mt-1">
+              Aucun enseignant de niveau {form.level} n'est encore enregistré.
             </p>
           )}
         </FormField>
