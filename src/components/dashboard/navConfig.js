@@ -11,6 +11,7 @@ import {
   IconFile,
   IconMapPin,
   IconShield,
+  IconBell,
 } from "../icons";
 
 export const navByRole = {
@@ -29,7 +30,7 @@ export const navByRole = {
       { to: "/app/passage-de-classe", label: "Passage de classe", icon: IconLayers },
       { to: "/app/statistiques", label: "Statistiques", icon: IconChart },
       { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
-      { to: "/app/annonces", label: "Annonces", icon: IconMessage },
+      { to: "/app/annonces", label: "Annonces", icon: IconBell },
       { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
       { to: "/app/bibliotheque", label: "Bibliothèque", icon: IconFile },
       { to: "/app/transport", label: "Transport", icon: IconMapPin },
@@ -50,7 +51,7 @@ export const navByRole = {
       { to: "/app/emploi-du-temps", label: "Emploi du temps", icon: IconCalendar },
       { to: "/app/passage-de-classe", label: "Passage de classe", icon: IconLayers },
       { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
-      { to: "/app/annonces", label: "Annonces", icon: IconMessage },
+      { to: "/app/annonces", label: "Annonces", icon: IconBell },
       { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
       { to: "/app/bibliotheque", label: "Bibliothèque", icon: IconFile },
       { to: "/app/cantine", label: "Cantine", icon: IconClipboard },
@@ -67,7 +68,7 @@ export const navByRole = {
       { to: "/app/absences", label: "Absences", icon: IconCalendar },
       { to: "/app/emploi-du-temps", label: "Emploi du temps", icon: IconCalendar },
       { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
-      { to: "/app/annonces", label: "Annonces", icon: IconMessage },
+      { to: "/app/annonces", label: "Annonces", icon: IconBell },
       { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
       { to: "/app/bibliotheque", label: "Bibliothèque", icon: IconFile },
     ]},
@@ -78,7 +79,7 @@ export const navByRole = {
       { to: "/app/mes-enfants", label: "Mes enfants", icon: IconUsers },
       { to: "/app/emploi-du-temps", label: "Emploi du temps", icon: IconCalendar },
       { to: "/app/calendrier", label: "Calendrier", icon: IconCalendar },
-      { to: "/app/annonces", label: "Annonces", icon: IconMessage },
+      { to: "/app/annonces", label: "Annonces", icon: IconBell },
       { to: "/app/messagerie", label: "Messagerie", icon: IconMessage },
       { to: "/app/cantine", label: "Cantine", icon: IconClipboard },
       { to: "/app/transport", label: "Transport", icon: IconMapPin },

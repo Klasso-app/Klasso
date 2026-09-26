@@ -10,8 +10,9 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import { uploadImageToCloudinary } from "../../lib/cloudinary";
 import { useAuth } from "../../context/AuthContext";
-import { IconPlus, IconMessage } from "../../components/icons";
+import { IconPlus, IconBell, IconFile } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import SearchInput from "../../components/dashboard/SearchInput";
 import FormField, { TextInput } from "../../components/auth/FormField";
@@ -76,7 +77,7 @@ export default function AnnouncementsPage() {
       {!loading && visibleAnnouncements.length === 0 ? (
         <div className="rounded-xl border border-line bg-surface">
           <EmptyState
-            icon={IconMessage}
+            icon={IconBell}
             title={announcements.length === 0 ? "Aucune annonce pour le moment" : "Aucun résultat"}
             text={announcements.length === 0 ? "Les informations importantes de l'établissement apparaîtront ici." : "Aucune annonce ne correspond à cette recherche."}
           />
@@ -94,6 +95,13 @@ export default function AnnouncementsPage() {
                 )}
               </div>
               <p className="mt-2 text-sm text-ink-soft whitespace-pre-wrap">{a.body}</p>
+              {a.posterUrl && (
+                <img
+                  src={a.posterUrl}
+                  alt={`Affiche — ${a.title}`}
+                  className="mt-4 rounded-lg border border-line max-w-full h-auto"
+                />
+              )}
               <p className="mt-4 text-xs text-ink-soft">Publié par {a.authorName}</p>
             </div>
           ))}
@@ -105,22 +113,70 @@ export default function AnnouncementsPage() {
 
 function NewAnnouncementForm({ schoolId, authorName, onDone }) {
   const [form, setForm] = useState({ title: "", body: "" });
+  const [posterFile, setPosterFile] = useState(null);
+  const [posterPreview, setPosterPreview] = useState("");
+  const [posterError, setPosterError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   function update(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   }
 
+  function handlePosterChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setPosterError("Merci de choisir un fichier image (PNG ou JPG).");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setPosterError("L'affiche ne doit pas dépasser 2 Mo.");
+      return;
+    }
+
+    setPosterError("");
+    if (posterPreview) URL.revokeObjectURL(posterPreview);
+    setPosterFile(file);
+    setPosterPreview(URL.createObjectURL(file));
+  }
+
+  function removePoster() {
+    if (posterPreview) URL.revokeObjectURL(posterPreview);
+    setPosterFile(null);
+    setPosterPreview("");
+    setPosterError("");
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
+    setPosterError("");
     try {
+      // L'affiche est optionnelle : si son envoi échoue, on prévient
+      // clairement sans bloquer la publication du message lui-même —
+      // l'annonce doit pouvoir passer avec ou sans affiche.
+      let posterUrl = "";
+      if (posterFile) {
+        try {
+          posterUrl = await uploadImageToCloudinary(posterFile);
+        } catch (err) {
+          setPosterError("L'envoi de l'affiche a échoué (annonce non publiée, réessayez).");
+          setSubmitting(false);
+          return;
+        }
+      }
+
       await addDoc(collection(db, "schools", schoolId, "announcements"), {
         ...form,
+        posterUrl,
         authorName: authorName || "École",
         createdAt: serverTimestamp(),
       });
+      if (posterPreview) URL.revokeObjectURL(posterPreview);
       setForm({ title: "", body: "" });
+      setPosterFile(null);
+      setPosterPreview("");
       onDone();
     } finally {
       setSubmitting(false);
@@ -144,13 +200,38 @@ function NewAnnouncementForm({ schoolId, authorName, onDone }) {
         />
       </FormField>
 
+      <FormField label="Affiche (optionnel)">
+        {posterPreview ? (
+          <div className="flex items-start gap-3">
+            <img src={posterPreview} alt="Aperçu de l'affiche" className="w-24 h-24 rounded-lg border border-line object-cover" />
+            <button type="button" onClick={removePoster} className="text-xs text-danger">
+              Retirer l'affiche
+            </button>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg px-4 py-2.5 cursor-pointer w-fit">
+            <IconFile className="w-4 h-4" />
+            Joindre une affiche
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              onChange={handlePosterChange}
+              className="hidden"
+            />
+          </label>
+        )}
+        <p className="text-xs text-ink-soft mt-1">Format PNG ou JPG, 2 Mo maximum.</p>
+      </FormField>
+
+      {posterError && <p className="text-sm text-danger bg-danger-soft rounded-lg px-3 py-2">{posterError}</p>}
+
       <div className="flex items-center gap-3 mt-2">
         <button
           type="submit"
           disabled={submitting}
           className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60"
         >
-          {submitting ? "Publication" : "Publier"}
+          {submitting ? (posterFile ? "Envoi de l'affiche..." : "Publication") : "Publier"}
         </button>
         <button type="button" onClick={onDone} className="text-sm text-ink-soft px-4 py-2.5">
           Annuler
