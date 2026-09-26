@@ -72,8 +72,11 @@ export default function GradesPage() {
   );
 
   const selectedClass = classes.find((c) => c.id === classId);
+  // Un élève transféré ou diplômé garde son classLabel d'origine — sans ce
+  // filtre sur le statut, il continuerait à apparaître dans la liste à
+  // noter comme s'il était toujours dans la classe.
   const classStudents = useMemo(
-    () => students.filter((s) => s.classLabel === selectedClass?.name),
+    () => students.filter((s) => s.classLabel === selectedClass?.name && (s.status || "Actif") === "Actif"),
     [students, selectedClass]
   );
   const selectedSubject = subjects.find((s) => s.name === subject);

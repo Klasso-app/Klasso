@@ -73,8 +73,11 @@ export default function AbsencesPage() {
   const selectedClass = classes.find((c) => c.id === classId);
   const isSecondaire = selectedClass?.level === "Secondaire";
 
+  // Un élève transféré ou diplômé garde son classLabel d'origine — sans ce
+  // filtre sur le statut, il continuerait à apparaître dans la liste
+  // d'appel comme s'il était toujours présent dans la classe.
   const classStudents = useMemo(
-    () => students.filter((s) => s.classLabel === selectedClass?.name),
+    () => students.filter((s) => s.classLabel === selectedClass?.name && (s.status || "Actif") === "Actif"),
     [students, selectedClass]
   );
 

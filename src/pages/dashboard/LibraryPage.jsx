@@ -46,6 +46,11 @@ export default function LibraryPage() {
     return () => unsubs.forEach((u) => u());
   }, [schoolId]);
 
+  const activeStudents = useMemo(
+    () => students.filter((s) => (s.status || "Actif") === "Actif"),
+    [students]
+  );
+
   const availability = useMemo(() => {
     const map = {};
     books.forEach((b) => { map[b.id] = b.quantity || 0; });
@@ -73,7 +78,7 @@ export default function LibraryPage() {
         <Catalogue schoolId={schoolId} books={books} availability={availability} loading={loading} />
       )}
       {tab === "Emprunts" && (
-        <Loans schoolId={schoolId} books={books} loans={loans} students={students} availability={availability} />
+        <Loans schoolId={schoolId} books={books} loans={loans} students={activeStudents} availability={availability} />
       )}
     </div>
   );

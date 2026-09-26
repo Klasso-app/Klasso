@@ -46,7 +46,7 @@ export default function StatsPage() {
 
   const classStats = useMemo(() => {
     return accessibleClasses.map((c) => {
-      const classStudents = students.filter((s) => s.classLabel === c.name);
+      const classStudents = students.filter((s) => s.classLabel === c.name && (s.status || "Actif") === "Actif");
       const averages = classStudents
         .map((s) => averageForStudent(grades, s.id, currentSchoolYear(), c.name))
         .filter((v) => v !== null);

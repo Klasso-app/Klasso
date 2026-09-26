@@ -81,6 +81,16 @@ export default function FinancesPage() {
     return students.filter((s) => accessibleClassNames.has(s.classLabel));
   }, [students, profile, accessibleClassNames]);
 
+  // Distinct de scopedStudents : ici on exclut aussi les élèves qui ont
+  // quitté l'établissement (transférés, diplômés), pour que le solde dû ne
+  // compte pas leurs frais de scolarité comme s'ils étaient toujours
+  // inscrits. L'historique des paiements, lui, reste basé sur
+  // scopedStudents pour ne rien faire disparaître d'un élève parti depuis.
+  const activeScopedStudents = useMemo(
+    () => scopedStudents.filter((s) => (s.status || "Actif") === "Actif"),
+    [scopedStudents]
+  );
+
   const scopedStudentIds = useMemo(() => new Set(scopedStudents.map((s) => s.id)), [scopedStudents]);
   const scopedPayments = useMemo(
     () => payments.filter((p) => scopedStudentIds.has(p.studentId)),
@@ -117,7 +127,7 @@ export default function FinancesPage() {
   // l'échéancier de scolarité — sinon un paiement de tenue scolaire
   // fausserait le solde des frais de scolarité.
   const balances = useMemo(() => {
-    return scopedStudents.map((s) => {
+    return activeScopedStudents.map((s) => {
       const due = (Number(s.annualFees) || 0) * (1 - (Number(s.discountPercent) || 0) / 100);
       const paid = payments
         .filter((p) => p.studentId === s.id && (!p.feeType || p.feeType === "Scolarité"))
@@ -271,7 +281,7 @@ export default function FinancesPage() {
       </div>
 
       {showPaymentForm && (
-        <NewPaymentForm schoolId={schoolId} students={scopedStudents} otherFees={otherFees} onDone={() => setShowPaymentForm(false)} />
+        <NewPaymentForm schoolId={schoolId} students={activeScopedStudents} otherFees={otherFees} onDone={() => setShowPaymentForm(false)} />
       )}
 
       <div className="rounded-xl border border-line bg-surface">

@@ -84,7 +84,7 @@ export default function ClassesPage() {
     : scopedClasses;
 
   function studentCount(className) {
-    return students.filter((s) => s.classLabel === className).length;
+    return students.filter((s) => s.classLabel === className && (s.status || "Actif") === "Actif").length;
   }
 
   async function handleDelete(klass) {
