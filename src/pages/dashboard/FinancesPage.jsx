@@ -41,6 +41,7 @@ export default function FinancesPage() {
   const [yearFilter, setYearFilter] = useState(currentSchoolYear());
   const [showReminders, setShowReminders] = useState(false);
   const [remindedIds, setRemindedIds] = useState(() => new Set());
+  const [historyStudent, setHistoryStudent] = useState(null);
 
   useEffect(() => {
     if (!schoolId) return;
@@ -325,16 +326,24 @@ export default function FinancesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-3">
-                      {remaining > 0 && student.guardianPhone && (
-                        <a
-                          href={buildReminderLink(student, remaining)}
-                          target="_blank"
-                          rel="noreferrer"
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => setHistoryStudent(student)}
                           className="text-xs text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1.5"
                         >
-                          Relancer
-                        </a>
-                      )}
+                          Historique
+                        </button>
+                        {remaining > 0 && student.guardianPhone && (
+                          <a
+                            href={buildReminderLink(student, remaining)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1.5"
+                          >
+                            Relancer
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -343,6 +352,10 @@ export default function FinancesPage() {
           </div>
         )}
       </div>
+
+      {historyStudent && (
+        <StudentHistoryModal student={historyStudent} payments={payments} onClose={() => setHistoryStudent(null)} />
+      )}
 
       {/* Autres frais — suivi */}
       {otherFees.length > 0 && (
@@ -657,6 +670,72 @@ function NewExpenseForm({ schoolId, onDone }) {
         <button type="button" onClick={onDone} className="text-sm text-ink-soft px-4 py-2.5">Annuler</button>
       </div>
     </form>
+  );
+}
+
+function StudentHistoryModal({ student, payments, onClose }) {
+  const studentPayments = payments
+    .filter((p) => p.studentId === student.id)
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  const byYear = useMemo(() => {
+    const groups = new Map();
+    studentPayments.forEach((p) => {
+      const year = p.schoolYear || currentSchoolYear();
+      if (!groups.has(year)) groups.set(year, []);
+      groups.get(year).push(p);
+    });
+    return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [studentPayments]);
+
+  const total = studentPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-ink/40 px-4 py-6 overflow-y-auto" onClick={onClose}>
+      <div
+        className="w-full max-w-lg bg-surface rounded-xl border border-line p-6 flex flex-col gap-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-base text-ink">Historique — {student.fullName}</h2>
+            <p className="text-sm text-ink-soft mt-0.5">
+              {student.classLabel || "—"} · {formatAmount(total)} payé au total, toutes années confondues
+            </p>
+          </div>
+          <button onClick={onClose} className="text-sm text-ink-soft shrink-0">Fermer</button>
+        </div>
+
+        {byYear.length === 0 ? (
+          <p className="text-sm text-ink-soft">Aucun paiement enregistré pour cet élève.</p>
+        ) : (
+          <div className="flex flex-col gap-5 max-h-[60vh] overflow-y-auto">
+            {byYear.map(([year, list]) => {
+              const yearTotal = list.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+              return (
+                <div key={year}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-ink">{year}</h3>
+                    <span className="text-xs text-ink-soft">{formatAmount(yearTotal)}</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {list.map((p) => (
+                      <div key={p.id} className="flex items-center justify-between text-sm border-t border-line pt-1.5">
+                        <div>
+                          <p className="text-ink-soft">{p.feeType || "Scolarité"} · {p.method}</p>
+                          <p className="text-xs text-ink-soft">{p.date}</p>
+                        </div>
+                        <span className="text-ink">{formatAmount(Number(p.amount) || 0)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
