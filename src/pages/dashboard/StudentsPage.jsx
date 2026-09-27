@@ -227,13 +227,14 @@ export default function StudentsPage() {
       </div>
 
       {(showForm || editing) && (
-        <StudentForm schoolId={schoolId} classes={accessibleClasses} tuitionFees={tuitionFees} editing={editing} onDone={closeForm} />
+        <StudentForm schoolId={schoolId} classes={accessibleClasses} students={students} tuitionFees={tuitionFees} editing={editing} onDone={closeForm} />
       )}
 
       {reenrolling && (
         <ReenrollForm
           schoolId={schoolId}
           classes={accessibleClasses}
+          students={students}
           tuitionFees={tuitionFees}
           student={reenrolling}
           onDone={() => setReenrolling(null)}
@@ -366,11 +367,19 @@ function ParentCodeCell({ schoolId, student }) {
   );
 }
 
-function ReenrollForm({ schoolId, classes, tuitionFees, student, onDone }) {
+function ReenrollForm({ schoolId, classes, students, tuitionFees, student, onDone }) {
   const [classLabel, setClassLabel] = useState(student.classLabel || "");
   const [submitting, setSubmitting] = useState(false);
   const targetYear = reenrollmentTargetYear(student.schoolYear);
   const suggestedFee = tuitionFees[classLabel];
+
+  // On exclut l'élève lui-même du décompte : s'il redouble dans la même
+  // classe, il y est déjà compté et ça fausserait l'alerte de capacité.
+  const selectedClass = classes.find((c) => c.name === classLabel);
+  const currentCount = students.filter(
+    (s) => s.classLabel === classLabel && (s.status || "Actif") === "Actif" && s.id !== student.id
+  ).length;
+  const overCapacity = selectedClass?.capacity && currentCount + 1 > selectedClass.capacity;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -408,6 +417,11 @@ function ReenrollForm({ schoolId, classes, tuitionFees, student, onDone }) {
             Frais de scolarité pour cette classe : {new Intl.NumberFormat("fr-FR").format(suggestedFee)} FCFA
           </p>
         )}
+        {overCapacity && (
+          <p className="text-xs text-warning mt-1">
+            {classLabel} compte déjà {currentCount} élève(s) pour une capacité de {selectedClass.capacity}.
+          </p>
+        )}
       </FormField>
       <div className="flex items-center gap-3">
         <button type="submit" disabled={submitting} className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60">
@@ -419,7 +433,7 @@ function ReenrollForm({ schoolId, classes, tuitionFees, student, onDone }) {
   );
 }
 
-function StudentForm({ schoolId, classes, tuitionFees, editing, onDone }) {
+function StudentForm({ schoolId, classes, students, tuitionFees, editing, onDone }) {
   const [form, setForm] = useState({
     fullName: editing?.fullName || "",
     classLabel: editing?.classLabel || "",
@@ -459,6 +473,14 @@ function StudentForm({ schoolId, classes, tuitionFees, editing, onDone }) {
   function removeCustomDocument(index) {
     setDocuments((docs) => docs.filter((_, i) => i !== index));
   }
+
+  // On exclut l'élève lui-même (cas d'une modification sans changement de
+  // classe) pour ne pas le compter deux fois dans l'alerte de capacité.
+  const selectedClass = classes.find((c) => c.name === form.classLabel);
+  const currentCount = students.filter(
+    (s) => s.classLabel === form.classLabel && (s.status || "Actif") === "Actif" && s.id !== editing?.id
+  ).length;
+  const overCapacity = selectedClass?.capacity && currentCount + 1 > selectedClass.capacity;
 
   function updateClassLabel(e) {
     const newClass = e.target.value;
@@ -529,6 +551,11 @@ function StudentForm({ schoolId, classes, tuitionFees, editing, onDone }) {
           {form.classLabel && tuitionFees[form.classLabel] !== undefined && (
             <p className="text-xs text-ink-soft mt-1">
               Frais de scolarité pour cette classe : {new Intl.NumberFormat("fr-FR").format(tuitionFees[form.classLabel])} FCFA
+            </p>
+          )}
+          {overCapacity && (
+            <p className="text-xs text-warning mt-1">
+              {form.classLabel} compte déjà {currentCount} élève(s) pour une capacité de {selectedClass.capacity}.
             </p>
           )}
         </FormField>

@@ -20,7 +20,7 @@ import { getAccessibleClasses } from "../../lib/scope";
 import { IconPlus, IconLayers } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
 import SearchInput from "../../components/dashboard/SearchInput";
-import FormField, { Select } from "../../components/auth/FormField";
+import FormField, { Select, TextInput } from "../../components/auth/FormField";
 
 export default function ClassesPage() {
   const { profile, firebaseUser } = useAuth();
@@ -183,7 +183,18 @@ export default function ClassesPage() {
                     <td className="px-6 py-3 text-ink-soft">
                       {c.headTeacherName || (c.level === "Secondaire" ? "Pas encore désigné" : "—")}
                     </td>
-                    <td className="px-6 py-3 text-ink-soft">{studentCount(c.name)}</td>
+                    <td className="px-6 py-3">
+                      {(() => {
+                        const count = studentCount(c.name);
+                        const over = c.capacity && count > c.capacity;
+                        return (
+                          <span className={over ? "text-warning font-medium" : "text-ink-soft"}>
+                            {count}{c.capacity ? ` / ${c.capacity}` : ""}
+                            {over && " · complet"}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     {!isTeacher && (
                       <td className="px-6 py-3">
                         <div className="flex items-center gap-3 flex-wrap">
@@ -223,6 +234,7 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
     name: editing?.name || "",
     level: editing?.level || "",
     headTeacherId: editing?.headTeacherId || "",
+    capacity: editing?.capacity != null ? String(editing.capacity) : "",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -253,6 +265,7 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
         level: form.level,
         headTeacherId: form.headTeacherId || null,
         headTeacherName: headTeacher?.fullName || "",
+        capacity: form.capacity ? Number(form.capacity) : null,
       };
       if (editing) {
         await updateDoc(doc(db, "schools", schoolId, "classes", editing.id), payload);
@@ -335,6 +348,18 @@ function ClassForm({ schoolId, teachers, editing, onDone }) {
               Aucun enseignant de niveau {form.level} n'est encore enregistré.
             </p>
           )}
+        </FormField>
+        <FormField label="Capacité (optionnel)">
+          <TextInput
+            type="number"
+            min="1"
+            value={form.capacity}
+            onChange={update("capacity")}
+            placeholder="Ex : 40"
+          />
+          <p className="text-xs text-ink-soft mt-1">
+            Laissez vide si vous ne voulez pas être alerté en cas de dépassement d'effectif.
+          </p>
         </FormField>
       </div>
 
