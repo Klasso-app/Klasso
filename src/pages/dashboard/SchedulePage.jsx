@@ -132,6 +132,7 @@ export default function SchedulePage() {
           classes={accessibleClasses}
           teachers={teachers}
           subjects={subjects}
+          slots={slots}
           onDone={() => setShowForm(false)}
         />
       )}
@@ -192,7 +193,25 @@ export default function SchedulePage() {
   );
 }
 
-function NewSlotForm({ schoolId, classes, teachers, subjects, onDone }) {
+// Deux créneaux se chevauchent s'ils commencent avant que l'autre ne
+// finisse (comparaison de chaînes "HH:MM" valide car toujours au même
+// format zéro-paddé, imposé par <input type="time">).
+function timesOverlap(startA, endA, startB, endB) {
+  return startA < endB && startB < endA;
+}
+
+function findConflicts(slots, { day, startTime, endTime, teacherId, classId }) {
+  if (!day || !startTime || !endTime || startTime >= endTime) return [];
+  return slots.filter((s) => {
+    if (s.day !== day) return false;
+    if (!timesOverlap(startTime, endTime, s.startTime, s.endTime)) return false;
+    const sameTeacher = teacherId && s.teacherId === teacherId;
+    const sameClass = classId && s.classId === classId;
+    return sameTeacher || sameClass;
+  });
+}
+
+function NewSlotForm({ schoolId, classes, teachers, subjects, slots, onDone }) {
   const [form, setForm] = useState({
     day: DAYS[0],
     startTime: "08:00",
@@ -207,8 +226,21 @@ function NewSlotForm({ schoolId, classes, teachers, subjects, onDone }) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   }
 
+  const conflicts = useMemo(() => findConflicts(slots, form), [slots, form]);
+
   async function handleSubmit(e) {
     e.preventDefault();
+
+    if (conflicts.length > 0) {
+      const lines = conflicts.map(
+        (c) => `- ${c.day} ${c.startTime}–${c.endTime} (${c.className}, ${c.subject}${c.teacherName ? `, ${c.teacherName}` : ""})`
+      );
+      const confirmed = window.confirm(
+        `Ce créneau chevauche ${conflicts.length} créneau(x) déjà programmé(s) :\n${lines.join("\n")}\n\nCréer quand même ce créneau ?`
+      );
+      if (!confirmed) return;
+    }
+
     setSubmitting(true);
     try {
       const klass = classes.find((c) => c.id === form.classId);
@@ -270,13 +302,28 @@ function NewSlotForm({ schoolId, classes, teachers, subjects, onDone }) {
         </FormField>
       </div>
 
+      {conflicts.length > 0 && (
+        <div className="rounded-lg border border-warning/30 bg-warning-soft px-4 py-3">
+          <p className="text-sm text-warning font-medium">
+            {conflicts.length} chevauchement{conflicts.length > 1 ? "s" : ""} détecté{conflicts.length > 1 ? "s" : ""} :
+          </p>
+          <ul className="text-xs text-ink-soft mt-1 flex flex-col gap-0.5">
+            {conflicts.map((c) => (
+              <li key={c.id}>
+                {c.day} {c.startTime}–{c.endTime} · {c.className} · {c.subject}{c.teacherName ? ` · ${c.teacherName}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 mt-2">
         <button
           type="submit"
           disabled={submitting}
           className="text-sm bg-indigo-500 text-white rounded-lg px-4 py-2.5 disabled:opacity-60"
         >
-          {submitting ? "Enregistrement" : "Ajouter au planning"}
+          {submitting ? "Enregistrement" : conflicts.length > 0 ? "Créer malgré le conflit" : "Ajouter au planning"}
         </button>
         <button type="button" onClick={onDone} className="text-sm text-ink-soft px-4 py-2.5">
           Annuler
