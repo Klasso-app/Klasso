@@ -34,3 +34,16 @@ export function reenrollmentTargetYear(previousSchoolYear, date = new Date()) {
   }
   return current;
 }
+
+// Un élève actif dont l'année scolaire enregistrée n'est ni l'année en
+// cours ni la suivante n'a pas encore été réinscrit (ni via « Réinscrire »,
+// ni via un passage de classe) — il reste rattaché à une année antérieure.
+// On exclut volontairement l'année suivante : un élève déjà réinscrit en
+// avance (avant la rentrée) ne doit pas être signalé comme en retard.
+// Logique centralisée ici (plutôt que dupliquée par page) pour éviter que
+// les deux copies divergent avec le temps.
+export function isPendingReenrollment(student, date = new Date()) {
+  if ((student.status || "Actif") !== "Actif") return false;
+  const year = student.schoolYear || "";
+  return year !== currentSchoolYear(date) && year !== nextSchoolYear(date);
+}

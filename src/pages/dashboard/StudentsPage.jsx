@@ -15,7 +15,7 @@ import { useAuth } from "../../context/AuthContext";
 import { createParentInvitation } from "../../lib/invitations";
 import { generateMatricule } from "../../lib/students";
 import { exportToCsv } from "../../lib/csv";
-import { currentSchoolYear, nextSchoolYear, reenrollmentTargetYear } from "../../lib/schoolYear";
+import { currentSchoolYear, nextSchoolYear, reenrollmentTargetYear, isPendingReenrollment } from "../../lib/schoolYear";
 import { logAction } from "../../lib/auditLog";
 import { getAccessibleClasses } from "../../lib/scope";
 import { IconPlus, IconUsers } from "../../components/icons";
@@ -96,27 +96,15 @@ export default function StudentsPage() {
   const schoolYear = currentSchoolYear();
   const upcomingSchoolYear = nextSchoolYear();
 
-  // Un élève actif dont l'année scolaire enregistrée n'est ni l'année en
-  // cours ni la suivante n'a pas encore été réinscrit (ni via « Réinscrire »
-  // sur cette page, ni via un passage de classe) — il reste rattaché à une
-  // année antérieure. On exclut volontairement l'année suivante : un élève
-  // déjà réinscrit en avance (avant la rentrée) ne doit pas être signalé
-  // comme en retard.
-  function isPendingReenrollment(s) {
-    if ((s.status || "Actif") !== "Actif") return false;
-    const year = s.schoolYear || "";
-    return year !== schoolYear && year !== upcomingSchoolYear;
-  }
-
   const pendingReenrollment = useMemo(
-    () => scopedStudents.filter(isPendingReenrollment),
+    () => scopedStudents.filter((s) => isPendingReenrollment(s)),
     [scopedStudents, schoolYear, upcomingSchoolYear]
   );
 
   const filteredStudents = useMemo(() => {
     if (filter === "Tous") return scopedStudents;
     if (filter === "Actifs") return scopedStudents.filter((s) => (s.status || "Actif") === "Actif");
-    if (filter === "Non réinscrits") return scopedStudents.filter(isPendingReenrollment);
+    if (filter === "Non réinscrits") return scopedStudents.filter((s) => isPendingReenrollment(s));
     return scopedStudents.filter((s) => (s.status || "Actif") !== "Actif");
   }, [scopedStudents, filter, schoolYear, upcomingSchoolYear]);
 

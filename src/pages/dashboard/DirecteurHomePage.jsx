@@ -12,7 +12,7 @@ import {
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { fetchAllGrades, averageForStudent } from "../../lib/grades";
-import { currentSchoolYear } from "../../lib/schoolYear";
+import { currentSchoolYear, isPendingReenrollment } from "../../lib/schoolYear";
 import { getAccessibleClasses } from "../../lib/scope";
 import StatCard from "../../components/dashboard/StatCard";
 import EmptyState from "../../components/dashboard/EmptyState";
@@ -32,6 +32,7 @@ export default function DirecteurHomePage() {
 
   const [counts, setCounts] = useState({ students: null, teachers: null, classes: null });
   const [avgGrade, setAvgGrade] = useState(null);
+  const [pendingReenrollment, setPendingReenrollment] = useState(null);
   const [recentStudents, setRecentStudents] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
 
@@ -104,6 +105,22 @@ export default function DirecteurHomePage() {
       );
     }
 
+    async function loadPendingReenrollment(classNames) {
+      let studentsSnap;
+      if (classNames === null) {
+        studentsSnap = await getDocs(collection(db, "schools", schoolId, "students"));
+      } else if (classNames.length === 0) {
+        setPendingReenrollment(0);
+        return;
+      } else {
+        studentsSnap = await getDocs(
+          query(collection(db, "schools", schoolId, "students"), where("classLabel", "in", classNames))
+        );
+      }
+      const students = studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setPendingReenrollment(students.filter((s) => isPendingReenrollment(s)).length);
+    }
+
     async function loadRecentStudents(classNames) {
       setLoadingList(true);
       if (classNames !== null && classNames.length === 0) {
@@ -127,6 +144,7 @@ export default function DirecteurHomePage() {
     getScopedClassNames().then((classNames) => {
       loadCounts(classNames).catch(() => setCounts({ students: 0, teachers: 0, classes: 0 }));
       loadAverage(classNames).catch(() => setAvgGrade(null));
+      loadPendingReenrollment(classNames).catch(() => setPendingReenrollment(null));
       loadRecentStudents(classNames).catch(() => setLoadingList(false));
     });
   }, [schoolId, profile?.level]);
@@ -139,6 +157,17 @@ export default function DirecteurHomePage() {
         <StatCard icon={IconLayers} label="Classes" value={fmt(counts.classes)} />
         <StatCard icon={IconChart} label="Moyenne générale" value={avgGrade === null ? "—" : `${avgGrade} / 20`} />
       </div>
+
+      {!!pendingReenrollment && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3">
+          <p className="text-sm text-ink">
+            <span className="font-medium">{pendingReenrollment}</span> élève{pendingReenrollment > 1 ? "s" : ""} actif{pendingReenrollment > 1 ? "s" : ""} pas encore réinscrit{pendingReenrollment > 1 ? "s" : ""} pour {currentSchoolYear()}.
+          </p>
+          <Link to="/app/eleves" className="text-xs text-indigo-600 shrink-0">
+            Voir la liste
+          </Link>
+        </div>
+      )}
 
       <div className="rounded-xl border border-line bg-surface">
         <div className="flex items-center justify-between px-6 py-5">
