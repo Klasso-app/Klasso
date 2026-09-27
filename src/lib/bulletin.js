@@ -1,16 +1,14 @@
 import { averageForStudent, subjectBreakdownForStudent } from "./grades";
 import { fetchImageAsDataUrl } from "./pdfImage";
 
-// jsPDF est chargé à la demande (et non au démarrage de l'app) pour ne pas
-// alourdir le chargement initial du dashboard, alors que peu de visites
-// génèrent réellement un bulletin.
-export async function downloadBulletin({ school, student, grades, term, rank, totalStudents, appreciation }) {
-  const { jsPDF } = await import("jspdf");
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
+// Dessine un bulletin sur la page courante du document jsPDF fourni (sans le
+// créer ni l'enregistrer) — partagé entre le téléchargement d'un seul
+// bulletin et celui de toute une classe, pour ne dupliquer ni la mise en
+// page ni le chargement du logo.
+function drawBulletinPage(doc, { school, student, grades, term, rank, totalStudents, appreciation, logoDataUrl }) {
   const marginX = 20;
   let y = 22;
 
-  const logoDataUrl = await fetchImageAsDataUrl(school?.logoUrl);
   if (logoDataUrl) {
     try {
       doc.addImage(logoDataUrl, "PNG", 165, 12, 22, 22);
@@ -129,8 +127,36 @@ export async function downloadBulletin({ school, student, grades, term, rank, to
   doc.setFontSize(9);
   doc.setTextColor(150, 150, 150);
   doc.text(`Document généré le ${new Date().toLocaleDateString("fr-FR")} via Klasso.`, marginX, y);
+}
 
+// jsPDF est chargé à la demande (et non au démarrage de l'app) pour ne pas
+// alourdir le chargement initial du dashboard, alors que peu de visites
+// génèrent réellement un bulletin.
+export async function downloadBulletin({ school, student, grades, term, rank, totalStudents, appreciation }) {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const logoDataUrl = await fetchImageAsDataUrl(school?.logoUrl);
+  drawBulletinPage(doc, { school, student, grades, term, rank, totalStudents, appreciation, logoDataUrl });
   doc.save(`bulletin-${slugify(student.fullName)}.pdf`);
+}
+
+// Génère un seul PDF regroupant le bulletin de chaque élève d'une classe
+// (un élève par page), plutôt que de déclencher un téléchargement par
+// élève — que la plupart des navigateurs bloqueraient de toute façon
+// au-delà de quelques fenêtres pop-up. Le logo n'est chargé qu'une fois et
+// réutilisé pour toutes les pages.
+// `entries` : [{ student, grades, term, rank, totalStudents, appreciation }, ...]
+export async function downloadClassBulletins({ school, classLabel, entries }) {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const logoDataUrl = await fetchImageAsDataUrl(school?.logoUrl);
+
+  entries.forEach((entry, index) => {
+    if (index > 0) doc.addPage();
+    drawBulletinPage(doc, { school, logoDataUrl, ...entry });
+  });
+
+  doc.save(`bulletins-${slugify(classLabel || "classe")}.pdf`);
 }
 
 function slugify(str) {

@@ -12,7 +12,7 @@ import {
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { averageForStudent } from "../../lib/grades";
-import { downloadBulletin } from "../../lib/bulletin";
+import { downloadBulletin, downloadClassBulletins } from "../../lib/bulletin";
 import { getAccessibleClasses } from "../../lib/scope";
 import { EVALUATION_TYPES_BY_LEVEL } from "../../lib/schoolLevels";
 import { currentSchoolYear } from "../../lib/schoolYear";
@@ -313,6 +313,7 @@ function ClassAverages({ schoolId, school, students, classId, className }) {
   const [grades, setGrades] = useState([]);
   const [appreciations, setAppreciations] = useState({});
   const [bulletinTerm, setBulletinTerm] = useState("Toutes les périodes");
+  const [generatingAll, setGeneratingAll] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "schools", schoolId, "grades"), (snap) =>
@@ -358,15 +359,42 @@ function ClassAverages({ schoolId, school, students, classId, className }) {
     .map((s) => ({ student: s, average: averageForStudent(relevantGrades, s.id) }))
     .sort((a, b) => (b.average ?? -1) - (a.average ?? -1));
 
+  async function handleDownloadAll() {
+    setGeneratingAll(true);
+    try {
+      const entries = ranked.map(({ student: s, average: avg }, index) => ({
+        student: s,
+        grades: classGrades,
+        term: bulletinTerm,
+        rank: avg === null ? null : index + 1,
+        totalStudents: students.length,
+        appreciation: appreciations[s.id] || "",
+      }));
+      await downloadClassBulletins({ school, classLabel: className, entries });
+    } finally {
+      setGeneratingAll(false);
+    }
+  }
+
   return (
     <div className="rounded-xl border border-line bg-surface">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-5">
         <h2 className="font-display text-base text-ink">Moyennes générales de la classe</h2>
-        <div className="w-full sm:w-56">
-          <Select value={bulletinTerm} onChange={(e) => setBulletinTerm(e.target.value)}>
-            <option>Toutes les périodes</option>
-            {TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
-          </Select>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="w-full sm:w-56">
+            <Select value={bulletinTerm} onChange={(e) => setBulletinTerm(e.target.value)}>
+              <option>Toutes les périodes</option>
+              {TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
+            </Select>
+          </div>
+          <button
+            onClick={handleDownloadAll}
+            disabled={generatingAll}
+            className="flex items-center gap-1.5 text-xs text-indigo-600 border border-indigo-200 rounded-md px-3 py-2 disabled:opacity-60 whitespace-nowrap"
+          >
+            <IconFile className="w-3.5 h-3.5" />
+            {generatingAll ? "Génération..." : "Tous les bulletins"}
+          </button>
         </div>
       </div>
       <div className="overflow-x-auto">
