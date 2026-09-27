@@ -17,6 +17,7 @@ export default function StatsPage() {
   const [students, setStudents] = useState([]);
   const [grades, setGrades] = useState([]);
   const [absences, setAbsences] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,6 +35,9 @@ export default function StatsPage() {
       ),
       onSnapshot(collection(db, "schools", schoolId, "absences"), (snap) =>
         setAbsences(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      ),
+      onSnapshot(collection(db, "schools", schoolId, "payments"), (snap) =>
+        setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
       ),
     ];
     return () => unsubs.forEach((u) => u());
@@ -77,6 +81,49 @@ export default function StatsPage() {
     }));
   }, [grades, accessibleClasses]);
 
+  // Tendances sur plusieurs années : les 5 dernières années scolaires,
+  // de la plus ancienne à l'actuelle.
+  const trendYears = useMemo(() => {
+    const [startYear] = currentSchoolYear().split("-").map(Number);
+    return Array.from({ length: 5 }, (_, i) => {
+      const s = startYear - (4 - i);
+      return `${s}-${s + 1}`;
+    });
+  }, []);
+
+  const accessibleClassNames = useMemo(() => new Set(accessibleClasses.map((c) => c.name)), [accessibleClasses]);
+  const scopedTrendStudents = useMemo(
+    () => (profile?.level ? students.filter((s) => accessibleClassNames.has(s.classLabel)) : students),
+    [students, profile, accessibleClassNames]
+  );
+  const scopedTrendStudentIds = useMemo(() => new Set(scopedTrendStudents.map((s) => s.id)), [scopedTrendStudents]);
+
+  // Recettes par année : fiable, car chaque paiement porte désormais
+  // l'année scolaire à laquelle il se rapporte (voir Finances).
+  const revenueByYear = useMemo(() => {
+    return trendYears.map((year) => ({
+      year,
+      total: payments
+        .filter((p) => (p.schoolYear || currentSchoolYear()) === year && scopedTrendStudentIds.has(p.studentId))
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
+    }));
+  }, [payments, scopedTrendStudentIds, trendYears]);
+
+  // Nouvelles inscriptions par année : basé sur la date de création du
+  // dossier élève, qui ne change jamais — contrairement au champ
+  // schoolYear d'un élève, mis à jour à chaque réinscription/passage de
+  // classe et qui ne reflète donc que sa situation la plus récente. On ne
+  // peut pas reconstituer l'effectif total de chaque année passée à partir
+  // des données actuelles, seulement les nouvelles arrivées.
+  const enrollmentsByYear = useMemo(() => {
+    return trendYears.map((year) => ({
+      year,
+      count: scopedTrendStudents.filter(
+        (s) => s.createdAt?.toDate && currentSchoolYear(s.createdAt.toDate()) === year
+      ).length,
+    }));
+  }, [scopedTrendStudents, trendYears]);
+
   if (!loading && accessibleClasses.length === 0) {
     return (
       <div className="rounded-xl border border-line bg-surface">
@@ -91,6 +138,44 @@ export default function StatsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="grid sm:grid-cols-2 gap-6">
+        <div className="rounded-xl border border-line bg-surface">
+          <div className="flex items-center justify-between px-6 py-5">
+            <h2 className="font-display text-base text-ink">Recettes par année</h2>
+            <button
+              onClick={() => exportToCsv("recettes-par-annee-klasso", revenueByYear.map((r) => ({
+                "Année scolaire": r.year,
+                "Total encaissé (FCFA)": Math.round(r.total),
+              })))}
+              className="text-xs text-indigo-600 border border-indigo-200 rounded-md px-3 py-2"
+            >
+              CSV
+            </button>
+          </div>
+          <div className="px-6 pb-6">
+            <YearBars data={revenueByYear} valueKey="total" format={(v) => formatAmount(v)} />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-line bg-surface">
+          <div className="flex items-center justify-between px-6 py-5">
+            <h2 className="font-display text-base text-ink">Nouvelles inscriptions par année</h2>
+            <button
+              onClick={() => exportToCsv("inscriptions-par-annee-klasso", enrollmentsByYear.map((r) => ({
+                "Année scolaire": r.year,
+                "Nouveaux élèves": r.count,
+              })))}
+              className="text-xs text-indigo-600 border border-indigo-200 rounded-md px-3 py-2"
+            >
+              CSV
+            </button>
+          </div>
+          <div className="px-6 pb-6">
+            <YearBars data={enrollmentsByYear} valueKey="count" format={(v) => String(v)} />
+          </div>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-line bg-surface">
         <div className="flex items-center justify-between px-6 py-5">
           <h2 className="font-display text-base text-ink">Statistiques par classe</h2>
@@ -173,4 +258,28 @@ export default function StatsPage() {
       </div>
     </div>
   );
+}
+
+function YearBars({ data, valueKey, format }) {
+  const max = Math.max(...data.map((d) => d[valueKey]), 1);
+  return (
+    <div className="flex flex-col gap-2.5">
+      {data.map((d) => (
+        <div key={d.year} className="flex items-center gap-3">
+          <span className="text-xs text-ink-soft w-20 shrink-0">{d.year}</span>
+          <div className="flex-1 h-2 rounded-full bg-surface-tint overflow-hidden">
+            <div
+              className="h-full rounded-full bg-indigo-500"
+              style={{ width: `${Math.max((d[valueKey] / max) * 100, d[valueKey] > 0 ? 3 : 0)}%` }}
+            />
+          </div>
+          <span className="text-xs text-ink w-24 text-right shrink-0">{format(d[valueKey])}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatAmount(n) {
+  return new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " FCFA";
 }
