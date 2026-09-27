@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { updateSchool, uploadSchoolLogo } from "../../lib/schools";
+import { exportSchoolBackup } from "../../lib/backup";
 import { logAction } from "../../lib/auditLog";
 import { IconShield, IconFile } from "../../components/icons";
 import EmptyState from "../../components/dashboard/EmptyState";
@@ -22,6 +23,9 @@ export default function SettingsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoError, setLogoError] = useState("");
+  const [backupStep, setBackupStep] = useState("");
+  const [backupResult, setBackupResult] = useState(null);
+  const [backupError, setBackupError] = useState("");
 
   if (!canEdit) {
     return (
@@ -81,6 +85,27 @@ export default function SettingsPage() {
       setSaved(true);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleBackup() {
+    setBackupError("");
+    setBackupResult(null);
+    setBackupStep("Préparation...");
+    try {
+      const result = await exportSchoolBackup(school.id, school.name, (name) => setBackupStep(`Export : ${name}...`));
+      setBackupResult(result);
+      logAction(school.id, {
+        actorUid: firebaseUser?.uid,
+        actorName: profile?.name,
+        action: "Export d'une sauvegarde complète",
+        details: `${result.totalDocs} document(s)`,
+      });
+    } catch (err) {
+      console.error(err);
+      setBackupError("L'export a échoué. Vérifiez votre connexion et réessayez.");
+    } finally {
+      setBackupStep("");
     }
   }
 
@@ -164,6 +189,39 @@ export default function SettingsPage() {
           {saved && <span className="text-sm text-success">Informations enregistrées</span>}
         </div>
       </form>
+
+      <div className="rounded-xl border border-line bg-surface p-6 flex flex-col gap-4">
+        <div>
+          <h2 className="font-display text-base text-ink">Sauvegarde complète</h2>
+          <p className="text-sm text-ink-soft mt-1">
+            Télécharge un fichier unique contenant toutes les données de l'école (élèves, enseignants,
+            notes, finances, messages...), pour garder une copie de sécurité de votre côté.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleBackup}
+            disabled={!!backupStep}
+            className="flex items-center gap-1.5 text-sm border border-indigo-200 text-indigo-600 rounded-lg px-4 py-2.5 disabled:opacity-60"
+          >
+            <IconFile className="w-4 h-4" />
+            {backupStep || "Télécharger une sauvegarde"}
+          </button>
+          {backupResult && (
+            <span className="text-sm text-success">{backupResult.totalDocs} document(s) exportés</span>
+          )}
+        </div>
+
+        {backupError && (
+          <p className="text-sm text-danger bg-danger-soft rounded-lg px-3 py-2">{backupError}</p>
+        )}
+
+        <p className="text-xs text-ink-soft">
+          Ce fichier contient des informations personnelles (élèves, tuteurs, paiements...) : gardez-le
+          privé et supprimez-le de vos téléchargements une fois mis en lieu sûr.
+        </p>
+      </div>
     </div>
   );
 }
