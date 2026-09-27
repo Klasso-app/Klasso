@@ -6,8 +6,6 @@ import {
   doc,
   getDoc,
   onSnapshot,
-  query,
-  orderBy,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
@@ -18,7 +16,21 @@ import EmptyState from "../../components/dashboard/EmptyState";
 import FormField, { TextInput, Select } from "../../components/auth/FormField";
 
 const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+const DAY_ORDER = Object.fromEntries(DAYS.map((d, i) => [d, i]));
 const ADMIN_ROLES = ["directeur", "secretaire"];
+
+// Trié côté client plutôt que via deux orderBy() Firestore, qui exigeraient
+// un index composite (jour + heure) créé manuellement dans la console
+// Firebase. Sans cet index, la requête échoue en silence côté client (pas
+// de gestionnaire d'erreur sur un onSnapshot) et la liste reste vide en
+// permanence, même quand des créneaux existent bel et bien.
+function sortSlots(list) {
+  return [...list].sort((a, b) => {
+    const dayDiff = (DAY_ORDER[a.day] ?? 99) - (DAY_ORDER[b.day] ?? 99);
+    if (dayDiff !== 0) return dayDiff;
+    return (a.startTime || "").localeCompare(b.startTime || "");
+  });
+}
 
 export default function SchedulePage() {
   const { profile } = useAuth();
@@ -39,9 +51,13 @@ export default function SchedulePage() {
   useEffect(() => {
     if (!schoolId) return;
     const unsubSlots = onSnapshot(
-      query(collection(db, "schools", schoolId, "schedule"), orderBy("day"), orderBy("startTime")),
+      collection(db, "schools", schoolId, "schedule"),
       (snap) => {
-        setSlots(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setSlots(sortSlots(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Erreur de chargement de l'emploi du temps :", err);
         setLoading(false);
       }
     );

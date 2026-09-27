@@ -128,16 +128,22 @@ export default function DirecteurHomePage() {
         setLoadingList(false);
         return;
       }
+      // Pas de orderBy("createdAt") combiné au where("classLabel","in",...) :
+      // ça exigerait un index composite créé manuellement dans la console
+      // Firebase (voir la même correction sur l'emploi du temps). On trie et
+      // on limite à 6 côté client à la place, pour ne jamais dépendre d'un
+      // index qui pourrait manquer.
       const q = classNames === null
         ? query(collection(db, "schools", schoolId, "students"), orderBy("createdAt", "desc"), limit(6))
-        : query(
-            collection(db, "schools", schoolId, "students"),
-            where("classLabel", "in", classNames),
-            orderBy("createdAt", "desc"),
-            limit(6)
-          );
+        : query(collection(db, "schools", schoolId, "students"), where("classLabel", "in", classNames));
       const snap = await getDocs(q);
-      setRecentStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      let list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (classNames !== null) {
+        list = list
+          .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+          .slice(0, 6);
+      }
+      setRecentStudents(list);
       setLoadingList(false);
     }
 
